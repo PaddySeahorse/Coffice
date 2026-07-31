@@ -11,7 +11,9 @@ requires-python = ">=3.11"
 license = "AGPL-3.0-or-later"
 license-files = ["LICENSE"]
 dependencies = [
-    "mcp",
+    # FastMCP API (mcp.run(transport="stdio")); the mcp 2.x line replaced it
+    # with the MCPServer API, so pin the 1.x line for the Route 1 MVP.
+    "mcp>=1.0,<2.0",
     "httpx",
     "python-dotenv",
     "pydantic",
