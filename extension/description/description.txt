@@ -1,0 +1,5 @@
+Coffice Agent Deck: AI sidebar for LibreOffice Writer. Hosts the React
+Agent Deck UI (http://127.0.0.1:8787 by default, overridable with
+COFFICE_UI_URL) and provides document commands (open doc, focus, save)
+to the agent. Requires LibreOffice 6.0 or newer and the co CLI
+(https://github.com/PaddySeahorse/co) for version snapshots.

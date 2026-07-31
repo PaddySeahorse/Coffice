@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest:manifest xmlns:manifest="http://openoffice.org/2001/manifest">
+  <!-- UNO components (Python). coffice_panel.py implements the sidebar
+       panel factory (com.sun.star.ui.XUIElementFactory) and the
+       org.coffice: protocol handler (com.sun.star.frame.ProtocolHandler). -->
+  <manifest:file-entry
+      manifest:media-type="application/vnd.sun.star.uno-component;type=Python"
+      manifest:full-path="python/coffice_panel.py"/>
+
+  <!-- Configuration data merged into the LO registry on install. -->
+  <manifest:file-entry
+      manifest:media-type="application/vnd.sun.star.configuration-data"
+      manifest:full-path="Sidebar.xcu"/>
+  <manifest:file-entry
+      manifest:media-type="application/vnd.sun.star.configuration-data"
+      manifest:full-path="Factories.xcu"/>
+  <manifest:file-entry
+      manifest:media-type="application/vnd.sun.star.configuration-data"
+      manifest:full-path="ProtocolHandler.xcu"/>
+  <manifest:file-entry
+      manifest:media-type="application/vnd.sun.star.configuration-data"
+      manifest:full-path="Addons.xcu"/>
+
+  <!-- Human-readable extension name in the Extension Manager. -->
+  <manifest:file-entry
+      manifest:media-type="application/vnd.sun.star.package-bundle-description"
+      manifest:full-path="description/title.txt"/>
+</manifest:manifest>
