@@ -165,25 +165,37 @@ class Document:
     # -- outline / selection / styles / tables --------------------------------
 
     def get_outline(self) -> list[dict[str, Any]]:
-        """List of headings: ``{index, level, style, text}`` (Heading 1-4)."""
-        text = self._doc.Text
-        enum = text.createEnumeration()
+        """List of headings: ``{start, end, level, style, text}`` (Heading 1-4).
+
+        ``start``/``end`` are character offsets into :meth:`get_text` output
+        covering the heading's paragraph text, so outline entries can be
+        passed directly to the range-based methods (:meth:`get_selection`,
+        :meth:`replace_range`, :meth:`apply_style`).
+        """
+        full = self.get_text()
+        enum = self._doc.Text.createEnumeration()
         outline: list[dict[str, Any]] = []
-        paragraph_index = 0
+        search_from = 0
         while enum.hasMoreElements():
             element = enum.nextElement()
-            if _supports_service(element, "com.sun.star.text.Paragraph"):
-                level = self._heading_level(element)
-                if level is not None:
-                    outline.append(
-                        {
-                            "index": paragraph_index,
-                            "level": level,
-                            "style": str(element.ParagraphStyleName),
-                            "text": str(element.String),
-                        }
-                    )
-                paragraph_index += 1
+            if not _supports_service(element, "com.sun.star.text.Paragraph"):
+                continue
+            paragraph_text = str(element.String)
+            start = full.find(paragraph_text, search_from)
+            if start < 0:
+                start = search_from
+            level = self._heading_level(element)
+            if level is not None:
+                outline.append(
+                    {
+                        "start": start,
+                        "end": start + len(paragraph_text),
+                        "level": level,
+                        "style": str(element.ParagraphStyleName),
+                        "text": paragraph_text,
+                    }
+                )
+            search_from = start + len(paragraph_text)
         return outline
 
     def _heading_level(self, paragraph: Any) -> int | None:

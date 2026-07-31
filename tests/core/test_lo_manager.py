@@ -56,6 +56,13 @@ def test_start_without_binary_raises() -> None:
         manager.start()
 
 
+def test_start_with_nonexistent_binary_raises_unavailable_with_pyuno(monkeypatch) -> None:
+    monkeypatch.setattr("coffice.core.lo_manager.pyuno_available", lambda: True)
+    manager = LoManager(soffice_bin="/nonexistent/soffice")
+    with pytest.raises(LibreOfficeUnavailableError):
+        manager.start()
+
+
 # -- integration tests (require LibreOffice + PyUNO) ---------------------------
 
 

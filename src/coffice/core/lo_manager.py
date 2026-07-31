@@ -205,7 +205,7 @@ class LoManager:
     # -- lifecycle ------------------------------------------------------------
 
     def _build_command(self, profile_dir: str) -> list[str]:
-        if not self._soffice_bin:
+        if not self._soffice_bin or not os.path.isfile(self._soffice_bin):
             raise LibreOfficeUnavailableError(
                 "soffice binary not found. Install LibreOffice "
                 "(e.g. `sudo apt install libreoffice` on Debian/Ubuntu) or set "
@@ -244,7 +244,7 @@ class LoManager:
             )
         with self._lock:
             self.stop()
-            if not self._soffice_bin:
+            if not self._soffice_bin or not os.path.isfile(self._soffice_bin):
                 raise LibreOfficeUnavailableError(
                     "soffice binary not found. Install LibreOffice "
                     "(e.g. `sudo apt install libreoffice` on Debian/Ubuntu) or set "

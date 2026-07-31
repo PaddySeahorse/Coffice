@@ -49,8 +49,8 @@ def test_apply_style_and_outline(desktop) -> None:
     assert [heading["level"] for heading in outline] == [1, 2]
     assert [heading["style"] for heading in outline] == ["Heading 1", "Heading 2"]
 
-    first = outline[0]["index"]
-    doc.apply_style({"start": first, "end": first + 1}, "Heading 3")
+    first = outline[0]
+    doc.apply_style({"start": first["start"], "end": first["end"]}, "Heading 3")
     levels = [heading["level"] for heading in doc.get_outline()]
     assert levels == [3, 2]
 

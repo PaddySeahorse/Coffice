@@ -129,3 +129,64 @@ def test_resolve_range_swaps_inverted_offsets() -> None:
 
 def test_get_manager_is_singleton() -> None:
     assert get_manager() is get_manager()
+
+
+class FakeEnum:
+    def __init__(self, elements: list[object]) -> None:
+        self._elements = list(elements)
+
+    def hasMoreElements(self) -> bool:
+        return bool(self._elements)
+
+    def nextElement(self) -> object:
+        return self._elements.pop(0)
+
+
+class FakeParagraphElement:
+    def __init__(self, text: str, style: str, outline_level: int) -> None:
+        self.String = text
+        self.ParagraphStyleName = style
+        self.OutlineLevel = outline_level
+
+    def supportsService(self, service: str) -> bool:
+        return service == "com.sun.star.text.Paragraph"
+
+
+class FakeTextWithEnum:
+    def __init__(self, content: str, paragraphs: list[FakeParagraphElement]) -> None:
+        self._content = content
+        self._paragraphs = paragraphs
+
+    def getString(self) -> str:
+        return self._content
+
+    def createEnumeration(self) -> FakeEnum:
+        return FakeEnum(list(self._paragraphs))
+
+
+class FakeDocWithOutline:
+    def __init__(self, content: str, paragraphs: list[FakeParagraphElement]) -> None:
+        self.Text = FakeTextWithEnum(content, paragraphs)
+
+    def getPropertyValue(self, name: str) -> bool:  # pragma: no cover - never reached
+        raise NotImplementedError
+
+
+def test_get_outline_reports_char_offsets() -> None:
+    content = "Intro paragraph\nChapter One\nBody text\nChapter Two\nMore body\n"
+    paragraphs = [
+        FakeParagraphElement("Intro paragraph\n", "Text Body", 0),
+        FakeParagraphElement("Chapter One\n", "Heading 1", 1),
+        FakeParagraphElement("Body text\n", "Text Body", 0),
+        FakeParagraphElement("Chapter Two\n", "Heading 2", 2),
+        FakeParagraphElement("More body\n", "Text Body", 0),
+    ]
+    outline = Document(FakeDocWithOutline(content, paragraphs)).get_outline()
+    assert [heading["text"] for heading in outline] == [
+        "Chapter One\n",
+        "Chapter Two\n",
+    ]
+    assert [heading["level"] for heading in outline] == [1, 2]
+    assert [heading["start"] for heading in outline] == [16, 38]
+    assert [heading["end"] for heading in outline] == [28, 50]
+    assert outline[0]["start"] == content.index("Chapter One\n")
