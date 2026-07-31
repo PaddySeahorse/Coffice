@@ -48,6 +48,7 @@ Python package layout under `src/coffice/`:
 
 ```sh
 make setup        # create .venv and install Python deps (uv preferred, pip fallback)
+make install-co   # clone + build the co CLI (sets CO_BIN; requires cmake + C++17 toolchain)
 make lint         # ruff check
 make test         # pytest
 make run-mcp      # run the MCP server over stdio
@@ -55,8 +56,11 @@ make build-sidebar  # build the React UI (placeholder until the UI bead lands)
 make smoke        # end-to-end smoke test (lands in the final integration bead)
 ```
 
-LibreOffice and the `co` CLI are external dependencies and are not vendored; see
-`docs/route1.md` for install instructions.
+The `co` CLI (version-control snapshots) is an external dependency installed by
+`make install-co` / `scripts/install_co.sh` (binary lands in `~/.local/bin/co`).
+The Python wrapper (`coffice.versioning`) reads `CO_BIN` and degrades gracefully
+with clear instructions when `co` is missing. LibreOffice is also external and
+not vendored; see `docs/route1.md` for install instructions.
 
 ## License
 

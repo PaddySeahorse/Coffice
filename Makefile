@@ -6,7 +6,7 @@ PY := $(BIN)/python
 PIP := $(BIN)/pip
 UI := ui
 
-.PHONY: setup test lint run-mcp build-sidebar smoke
+.PHONY: setup install-co test lint run-mcp build-sidebar smoke
 
 setup:
 	@if command -v $(UV) >/dev/null 2>&1; then \
@@ -23,6 +23,9 @@ setup:
 		exit 1; \
 	fi
 	@echo "Setup complete. Activate with: source $(VENV)/bin/activate"
+
+install-co:
+	@bash scripts/install_co.sh
 
 test:
 	$(PY) -m pytest
