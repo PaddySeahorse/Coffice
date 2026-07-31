@@ -11,8 +11,10 @@ in ``src/coffice/sidebar/__init__.py``.
 
 from __future__ import annotations
 
+import os
 import py_compile
 import subprocess
+import sys
 import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
@@ -214,7 +216,41 @@ def test_shipped_doc_commands_matches_source(oxt_path: Path) -> None:
     shipped_body = "\n".join(shipped.splitlines()[1:]).rstrip("\n")
     source_path = REPO_ROOT / "src" / "coffice" / "sidebar" / "doc_commands.py"
     source = source_path.read_text(encoding="utf-8").rstrip("\n")
+    # build.sh rewrites the intra-package import for the flat shipped layout.
+    source = source.replace(
+        "from coffice.sidebar.contract import DOC_COMMANDS",
+        "from coffice.contract import DOC_COMMANDS",
+    )
     assert shipped_body == source
+
+
+def test_shipped_package_imports(oxt_path: Path, tmp_path: Path) -> None:
+    """Import the shipped ``coffice`` package exactly as the UNO component does.
+
+    ``coffice_panel.py`` runs ``from coffice import contract, doc_commands`` at
+    module import time, so an unresolvable import here would prevent the whole
+    component from loading and the extension would not activate. ``py_compile``
+    (see :func:`test_python_files_compile`) only checks syntax and never
+    executes imports -- this test extracts the .oxt, puts ``python/`` on
+    ``sys.path`` (via PYTHONPATH, in a fresh subprocess so the repo's own
+    installed ``coffice`` package cannot shadow the shipped one) and imports
+    the real shipped modules.
+    """
+    extracted = tmp_path / "oxt"
+    with zipfile.ZipFile(oxt_path) as zf:
+        zf.extractall(extracted)
+    env = {**os.environ, "PYTHONPATH": str(extracted / "python")}
+    result = subprocess.run(
+        [sys.executable, "-c", "import coffice.contract; import coffice.doc_commands"],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, (
+        "shipped coffice package is not importable:\n"
+        f"{result.stdout}\n{result.stderr}"
+    )
 
 
 def test_icon_is_valid_png(oxt_path: Path) -> None:
