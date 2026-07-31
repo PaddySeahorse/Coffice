@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Registers the "Coffice" deck and panel with the LibreOffice sidebar
+     (org.openoffice.Office.UI/Sidebar/Content). The panel is created by the
+     XUIElementFactory registered in Factories.xcu; see
+     src/coffice/sidebar/__init__.py for the hosting decision. -->
+<oor:component-data xmlns:oor="http://openoffice.org/2001/registry"
+                    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                    oor:name="Sidebar" oor:package="org.openoffice.Office.UI">
+  <node oor:name="Content">
+    <node oor:name="DeckList">
+      <node oor:name="CofficeDeck" oor:op="replace">
+        <prop oor:name="Title" oor:type="xs:string">
+          <value xml:lang="en-US">Coffice</value>
+        </prop>
+        <prop oor:name="Id" oor:type="xs:string">
+          <value>org.coffice.deck</value>
+        </prop>
+        <prop oor:name="IconURL" oor:type="xs:string">
+          <value>vnd.sun.star.extension://org.coffice.sidebar/icons/coffice.png</value>
+        </prop>
+        <prop oor:name="ContextList">
+          <value oor:separator=";">Writer, any, visible ; WriterVariants, any, visible</value>
+        </prop>
+        <prop oor:name="OrderIndex" oor:type="xs:int"><value>500</value></prop>
+      </node>
+    </node>
+    <node oor:name="PanelList">
+      <node oor:name="CofficePanel" oor:op="replace">
+        <prop oor:name="Title" oor:type="xs:string">
+          <value xml:lang="en-US">Coffice Agent</value>
+        </prop>
+        <prop oor:name="Id" oor:type="xs:string">
+          <value>org.coffice.panel</value>
+        </prop>
+        <prop oor:name="DeckId" oor:type="xs:string">
+          <value>org.coffice.deck</value>
+        </prop>
+        <prop oor:name="ContextList">
+          <value oor:separator=";">Writer, any, visible ; WriterVariants, any, visible</value>
+        </prop>
+        <prop oor:name="ImplementationURL" oor:type="xs:string">
+          <value>private:resource/toolpanel/CofficeFactory/CofficePanel</value>
+        </prop>
+        <prop oor:name="OrderIndex" oor:type="xs:int"><value>100</value></prop>
+        <prop oor:name="TitleBarIsOptional" oor:type="xs:boolean"><value>true</value></prop>
+        <prop oor:name="WantsCanvas" oor:type="xs:boolean"><value>false</value></prop>
+        <prop oor:name="DefaultMenuCommand">
+          <value>org.coffice:ToggleSidebar</value>
+        </prop>
+      </node>
+    </node>
+  </node>
+</oor:component-data>

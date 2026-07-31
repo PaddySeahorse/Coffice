@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Registers the org.coffice: URL protocol. The node name is the UNO service
+     name of the handler component (python/coffice_panel.py implements
+     com.sun.star.frame.ProtocolHandler under org.coffice.sidebar.ProtocolHandler).
+     The "Coffice" menu item (Addons.xcu) and the panel's DefaultMenuCommand
+     dispatch org.coffice:ToggleSidebar, which opens/closes the Coffice deck. -->
+<oor:component-data xmlns:oor="http://openoffice.org/2001/registry"
+                    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                    oor:name="ProtocolHandler" oor:package="org.openoffice.Office">
+  <node oor:name="HandlerSet">
+    <node oor:name="org.coffice.sidebar.ProtocolHandler" oor:op="replace">
+      <prop oor:name="Protocols" oor:type="oor:string-list">
+        <value>org.coffice:*</value>
+      </prop>
+    </node>
+  </node>
+</oor:component-data>
