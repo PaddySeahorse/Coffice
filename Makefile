@@ -6,7 +6,7 @@ PY := $(BIN)/python
 PIP := $(BIN)/pip
 UI := ui
 
-.PHONY: setup install-co test lint run-mcp build-sidebar smoke
+.PHONY: setup install-co test lint run-mcp build-sidebar build-oxt install-oxt smoke
 
 setup:
 	@if command -v $(UV) >/dev/null 2>&1; then \
@@ -38,6 +38,17 @@ run-mcp:
 
 build-sidebar:
 	@if [ -f $(UI)/package.json ]; then npm --prefix $(UI) run build; else echo "SKIPPED: $(UI)/ is a placeholder, no package.json yet"; fi
+
+build-oxt:
+	@bash extension/build.sh
+
+install-oxt:
+	@if command -v unopkg >/dev/null 2>&1; then \
+		unopkg add --force dist/Coffice.oxt; \
+	else \
+		echo "unopkg not found; run 'make build-oxt' then install manually:"; \
+		echo "  unopkg add dist/Coffice.oxt"; \
+	fi
 
 smoke:
 	@if [ -f scripts/smoke_route1.sh ]; then bash scripts/smoke_route1.sh; else echo "SKIPPED: scripts/smoke_route1.sh lands in the final integration bead"; fi

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Registers the XUIElementFactory implementation that creates the Coffice
+     sidebar panel. "Name" must match the second segment of the panel's
+     ImplementationURL (private:resource/toolpanel/CofficeFactory/...);
+     "FactoryImplementation" is the UNO service name of the Python component
+     in python/coffice_panel.py. -->
+<oor:component-data xmlns:oor="http://openoffice.org/2001/registry"
+                    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                    oor:name="Factories" oor:package="org.openoffice.Office.UI">
+  <node oor:name="Registered">
+    <node oor:name="UIElementFactories">
+      <node oor:name="CofficeFactory" oor:op="replace">
+        <prop oor:name="Type"><value>toolpanel</value></prop>
+        <prop oor:name="Name"><value>CofficeFactory</value></prop>
+        <prop oor:name="Module"><value/></prop>
+        <prop oor:name="FactoryImplementation">
+          <value>org.coffice.sidebar.PanelFactory</value>
+        </prop>
+      </node>
+    </node>
+  </node>
+</oor:component-data>
