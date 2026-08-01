@@ -12,6 +12,7 @@ Public API::
 
 from coffice.mcp.middleware import Round, RoundStartHook, RoundTracker, start_round
 from coffice.mcp.server import (
+    GOVERNANCE_TOOL_NAMES,
     READ_TOOL_NAMES,
     SERVER_INSTRUCTIONS,
     SERVER_NAME,
@@ -29,6 +30,7 @@ from coffice.mcp.tools_write import (
 
 __all__ = [
     "FORBIDDEN_OPS",
+    "GOVERNANCE_TOOL_NAMES",
     "READ_TOOL_NAMES",
     "SERVER_INSTRUCTIONS",
     "SERVER_NAME",
