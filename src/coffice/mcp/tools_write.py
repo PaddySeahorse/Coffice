@@ -566,6 +566,21 @@ def confirm_op(
             pending.doc_id,
             exc,
         )
+        # Clean up the pre-op snapshot to avoid orphaned commit
+        path = ctx.registry.path(pending.doc_id)
+        if path:
+            try:
+                ctx.co_client.checkout(path, pending.snapshot_hash)
+                logger.info(
+                    "rolled back pre-op snapshot %s after confirmed edit failure",
+                    pending.snapshot_hash,
+                )
+            except CoError as checkout_exc:
+                logger.warning(
+                    "failed to roll back pre-op snapshot %s: %s",
+                    pending.snapshot_hash,
+                    checkout_exc,
+                )
         return {
             "ok": False,
             "tool": pending.tool,
