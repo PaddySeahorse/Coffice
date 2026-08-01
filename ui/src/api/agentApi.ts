@@ -49,7 +49,8 @@ export async function sendChat(
       session_id: sessionId,
       human_operator: humanOperator,
     });
-  } catch {
+  } catch (err) {
+    console.error("[agentApi] sendChat failed, falling back to mock:", err);
     return mockChatReply(message, sessionId ?? "mock-session");
   }
 }
@@ -67,7 +68,8 @@ export async function sendConfirmation(
       token: request.token,
       action: request.action,
     });
-  } catch {
+  } catch (err) {
+    console.error("[agentApi] sendConfirmation failed, falling back to mock:", err);
     return {
       status: "complete",
       reply:
