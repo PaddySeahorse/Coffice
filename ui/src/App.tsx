@@ -276,9 +276,11 @@ export default function App() {
         label: "回滚到上一步",
         hint: "回滚到上一个版本提交",
         run: () => {
-          if (history.length >= 2) void handleRollback(history[1].hash);
-          else if (history.length === 1) void handleRollback(history[0].hash);
-          else showBanner("info", "没有可回滚的提交");
+          if (history.length >= 2) {
+            void handleRollback(history[1].hash);
+          } else {
+            showBanner("info", "没有可回滚的提交（至少需要两个提交）");
+          }
         },
       },
       {
