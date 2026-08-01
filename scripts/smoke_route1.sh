@@ -157,98 +157,99 @@ def main() -> None:
     from coffice.mcp import create_server
     from coffice.versioning import CoClient, resolve_bin_path
 
-    workdir = Path(tempfile.mkdtemp(prefix="coffice-smoke-"))
-    doc_path = workdir / "report.docx"
+    with tempfile.TemporaryDirectory(prefix="coffice-smoke-") as workdir_str:
+        workdir = Path(workdir_str)
+        doc_path = workdir / "report.docx"
 
-    # ---- (1) start LibreOffice headless ----------------------------------
-    step("starting LibreOffice headless (UNO socket)")
-    manager = get_manager()
-    manager.ensure_running()
-    desktop = manager.get_desktop()
-    step("  LibreOffice headless instance up")
+        # ---- (1) start LibreOffice headless ----------------------------------
+        step("starting LibreOffice headless (UNO socket)")
+        manager = get_manager()
+        manager.ensure_running()
+        desktop = manager.get_desktop()
+        step("  LibreOffice headless instance up")
 
-    # ---- (2) create a sample report.docx ----------------------------------
-    step(f"creating sample report.docx ({doc_path})")
-    doc = Document.create(desktop)
-    doc.insert_text(0, "Coffice Smoke Report", style="Heading 1")
-    doc.insert_text("end", "\nIntro paragraph.\n")
-    doc.insert_text("end", "Findings", style="Heading 2")
-    doc.insert_text("end", "\nBody of the findings.\n")
-    doc.save(str(doc_path))
-    doc.close()
+        # ---- (2) create a sample report.docx ----------------------------------
+        step(f"creating sample report.docx ({doc_path})")
+        doc = Document.create(desktop)
+        doc.insert_text(0, "Coffice Smoke Report", style="Heading 1")
+        doc.insert_text("end", "\nIntro paragraph.\n")
+        doc.insert_text("end", "Findings", style="Heading 2")
+        doc.insert_text("end", "\nBody of the findings.\n")
+        doc.save(str(doc_path))
+        doc.close()
 
-    # initialize the co repository and wire the real MCP server on the doc
-    co = CoClient(bin_path=resolve_bin_path())
-    co.init(str(doc_path))
-    step("  co repository initialized inside report.docx")
-    os.environ["COFFICE_DOC_PATH"] = str(doc_path)
-    server = create_server()
+        # initialize the co repository and wire the real MCP server on the doc
+        co = CoClient(bin_path=resolve_bin_path())
+        co.init(str(doc_path))
+        step("  co repository initialized inside report.docx")
+        os.environ["COFFICE_DOC_PATH"] = str(doc_path)
+        server = create_server()
 
-    # ---- (3) scripted agent round over the MCP server ----------------------
-    step("agent round: getOutline")
-    outline = call(server, "getOutline")
-    headings = outline.get("outline") or []
-    assert headings, f"getOutline returned no headings: {outline!r}"
-    assert any(h.get("level") == 1 for h in headings), "expected a Heading 1 in outline"
-    step(f"  outline OK ({len(headings)} heading(s))")
+        # ---- (3) scripted agent round over the MCP server ----------------------
+        step("agent round: getOutline")
+        outline = call(server, "getOutline")
+        headings = outline.get("outline") or []
+        assert headings, f"getOutline returned no headings: {outline!r}"
+        assert any(h.get("level") == 1 for h in headings), "expected a Heading 1 in outline"
+        step(f"  outline OK ({len(headings)} heading(s))")
 
-    step("agent round: insertText (low risk, runs immediately)")
-    inserted = call(server, "insertText", pos="end", text="\nSmoke-injected paragraph.\n")
-    assert inserted.get("ok"), f"insertText failed: {inserted!r}"
-    step("  insertText OK")
+        step("agent round: insertText (low risk, runs immediately)")
+        inserted = call(server, "insertText", pos="end", text="\nSmoke-injected paragraph.\n")
+        assert inserted.get("ok"), f"insertText failed: {inserted!r}"
+        step("  insertText OK")
 
-    step("agent round: snapshot (manual checkpoint via co)")
-    snap = call(server, "snapshot", label="smoke checkpoint")
-    assert snap.get("ok") and snap.get("hash"), f"snapshot failed: {snap!r}"
-    snap_hash = snap["hash"]
-    step(f"  snapshot OK ({snap_hash})")
+        step("agent round: snapshot (manual checkpoint via co)")
+        snap = call(server, "snapshot", label="smoke checkpoint")
+        assert snap.get("ok") and snap.get("hash"), f"snapshot failed: {snap!r}"
+        snap_hash = snap["hash"]
+        step(f"  snapshot OK ({snap_hash})")
 
-    step("agent round: insertText (edit that rollback must undo)")
-    second = call(server, "insertText", pos="end", text="\nDO NOT KEEP THIS LINE.\n")
-    assert second.get("ok"), f"second insertText failed: {second!r}"
-    step("  second insertText OK")
+        step("agent round: insertText (edit that rollback must undo)")
+        second = call(server, "insertText", pos="end", text="\nDO NOT KEEP THIS LINE.\n")
+        assert second.get("ok"), f"second insertText failed: {second!r}"
+        step("  second insertText OK")
 
-    step(f"agent round: rollback -> {snap_hash}")
-    rolled = call(server, "rollback", hash=snap_hash)
-    assert rolled.get("ok"), f"rollback failed: {rolled!r}"
-    step("  rollback OK")
+        step(f"agent round: rollback -> {snap_hash}")
+        rolled = call(server, "rollback", hash=snap_hash)
+        assert rolled.get("ok"), f"rollback failed: {rolled!r}"
+        step("  rollback OK")
 
-    step("verify content restored on disk after rollback")
-    text = docx_text(doc_path)
-    assert "Smoke-injected paragraph" in text, "pre-snapshot content missing after rollback"
-    assert "DO NOT KEEP THIS LINE" not in text, "post-snapshot content survived rollback"
-    step("  content restored OK")
+        step("verify content restored on disk after rollback")
+        text = docx_text(doc_path)
+        assert "Smoke-injected paragraph" in text, "pre-snapshot content missing after rollback"
+        assert "DO NOT KEEP THIS LINE" not in text, "post-snapshot content survived rollback"
+        step("  content restored OK")
 
-    # ---- (4) exportDoc PURE + .co-bundle -----------------------------------
-    step("exportDoc (PURE, with .co-bundle companion)")
-    export = call(
-        server,
-        "exportDoc",
-        includeCo=False,
-        includeBundle=True,
-        path=str(workdir / "export.docx"),
-    )
-    assert export.get("ok"), f"exportDoc failed: {export!r}"
-    pure = Path(export["path"])
-    bundle = Path(export["bundlePath"])
-    assert pure.is_file(), f"pure export missing: {pure}"
-    assert bundle.is_file(), f"bundle missing: {bundle}"
+        # ---- (4) exportDoc PURE + .co-bundle -----------------------------------
+        step("exportDoc (PURE, with .co-bundle companion)")
+        export = call(
+            server,
+            "exportDoc",
+            includeCo=False,
+            includeBundle=True,
+            path=str(workdir / "export.docx"),
+        )
+        assert export.get("ok"), f"exportDoc failed: {export!r}"
+        pure = Path(export["path"])
+        bundle = Path(export["bundlePath"])
+        assert pure.is_file(), f"pure export missing: {pure}"
+        assert bundle.is_file(), f"bundle missing: {bundle}"
 
-    with zipfile.ZipFile(pure) as zf:
-        names = zf.namelist()
-    assert not any(n.startswith(".co/") for n in names), "PURE export must not contain .co/"
-    step("  pure export has no .co/ (verified, Word/WPS-compatible)")
+        with zipfile.ZipFile(pure) as zf:
+            names = zf.namelist()
+        assert not any(n.startswith(".co/") for n in names), "PURE export must not contain .co/"
+        step("  pure export has no .co/ (verified, Word/WPS-compatible)")
 
-    step("verify history round-trips from the .co-bundle")
-    restored = workdir / "restored.docx"
-    shutil.copy2(pure, restored)  # a fresh copy with no history
-    co.import_bundle(str(restored), str(bundle), force=True)
-    commits = co.log(str(restored))
-    assert commits, "no history found after importing the .co-bundle"
-    step(f"  bundle history OK ({len(commits)} commit(s) restored via co import)")
+        step("verify history round-trips from the .co-bundle")
+        restored = workdir / "restored.docx"
+        shutil.copy2(pure, restored)  # a fresh copy with no history
+        co.import_bundle(str(restored), str(bundle), force=True)
+        commits = co.log(str(restored))
+        assert commits, "no history found after importing the .co-bundle"
+        step(f"  bundle history OK ({len(commits)} commit(s) restored via co import)")
 
-    print("\nSMOKE PASS: Route 1 closed loop verified "
-          "(LO headless -> MCP tools -> co history -> rollback -> PURE export + bundle)")
+        print("\nSMOKE PASS: Route 1 closed loop verified "
+              "(LO headless -> MCP tools -> co history -> rollback -> PURE export + bundle)")
 
 
 if __name__ == "__main__":
