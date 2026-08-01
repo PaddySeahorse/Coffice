@@ -10,22 +10,37 @@ Public API::
     round_ = start_round("AI-Writer", "alice")  # per-round snapshot boundary
 """
 
-from coffice.mcp.middleware import Round, RoundTracker, start_round
+from coffice.mcp.middleware import Round, RoundStartHook, RoundTracker, start_round
 from coffice.mcp.server import (
     READ_TOOL_NAMES,
     SERVER_INSTRUCTIONS,
     SERVER_NAME,
     SERVER_VERSION,
+    WRITE_TOOL_NAMES,
     create_server,
+)
+from coffice.mcp.tools_write import (
+    FORBIDDEN_OPS,
+    RiskLevel,
+    classify,
+    confirms_required,
+    requires_confirmation,
 )
 
 __all__ = [
+    "FORBIDDEN_OPS",
     "READ_TOOL_NAMES",
     "SERVER_INSTRUCTIONS",
     "SERVER_NAME",
     "SERVER_VERSION",
+    "WRITE_TOOL_NAMES",
+    "RiskLevel",
     "Round",
+    "RoundStartHook",
     "RoundTracker",
+    "classify",
+    "confirms_required",
     "create_server",
+    "requires_confirmation",
     "start_round",
 ]

@@ -23,6 +23,15 @@ Configuration comes from the environment:
 The registry opens documents lazily, so the server starts over stdio even
 before LibreOffice is up; tools that need the document return a structured
 error until it can be opened.
+
+Write tools + snapshot middleware
+---------------------------------
+The server also registers the write tools (planning doc 4.2) and the
+per-round snapshot middleware (doc 4.1): starting a round with
+``start_round`` fires a hook that takes exactly one ``pre: <round_id>``
+``co commit`` per round; medium/high-risk edits additionally snapshot
+immediately before execution and require ``confirmOp``/``rejectOp``
+confirmation (see ``coffice.mcp.tools_write``).
 """
 
 from __future__ import annotations
@@ -34,7 +43,8 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from coffice.mcp import tools_read
+from coffice.mcp import tools_read, tools_write
+from coffice.mcp.middleware import RoundTracker, get_tracker
 from coffice.mcp.registry import DEFAULT_DOC_ID, DocumentRegistry
 from coffice.versioning.co_client import CoClient, default_client
 
@@ -45,10 +55,13 @@ SERVER_VERSION = "0.1.0"
 
 SERVER_INSTRUCTIONS = (
     "Coffice MCP server: you are connected to a LibreOffice Writer document "
-    "and may read it through the get* tools. Read the document with "
-    "getOutline/getSelection before suggesting or making edits. This Phase 1 "
-    "MVP only exposes read tools; write/version/governance tools land in "
-    "later beads. renderTile (AI vision) is NOT supported in the MVP."
+    "and may read it through the get* tools and edit it through the write "
+    "tools (insertText, replaceRange, applyStyle, generateTable, "
+    "refactorSection, setPageLayout). Read the document with "
+    "getOutline/getSelection before making edits. Medium/high-risk edits "
+    "return {status: needs_confirmation} and only run after confirmOp; "
+    "version snapshots happen once per round, not per tool call. "
+    "renderTile (AI vision) is NOT supported in the MVP."
 )
 
 #: The 7 read tools required by the acceptance criteria, in registration order.
@@ -60,6 +73,18 @@ READ_TOOL_NAMES = (
     "getRedlines",
     "getHistory",
     "getDiff",
+)
+
+#: The 6 write tools (planning doc 4.2 write table) + confirmation helpers.
+WRITE_TOOL_NAMES = (
+    "insertText",
+    "replaceRange",
+    "applyStyle",
+    "generateTable",
+    "refactorSection",
+    "setPageLayout",
+    "confirmOp",
+    "rejectOp",
 )
 
 
@@ -82,16 +107,21 @@ def _env_lo_port() -> int | None:
 def create_server(
     registry: DocumentRegistry | None = None,
     co_client: CoClient | None = None,
+    round_tracker: RoundTracker | None = None,
     name: str = SERVER_NAME,
     version: str = SERVER_VERSION,
 ) -> FastMCP:
-    """Build the FastMCP server with the document registry and read tools.
+    """Build the FastMCP server with the document registry and MCP tools.
 
     Args:
         registry: document registry; defaults to one wired from the env
             (``COFFICE_DOC_PATH`` / ``COFFICE_LO_PORT``).
-        co_client: co CLI wrapper used by ``getHistory``/``getDiff``; defaults
-            to the standard binary discovery client.
+        co_client: co CLI wrapper used by the version read tools and the
+            write-tools snapshot middleware; defaults to the standard binary
+            discovery client.
+        round_tracker: tracker whose ``start_round`` fires the pre-round
+            snapshot hook; defaults to the process-wide tracker (so the
+            module-level :func:`coffice.mcp.start_round` snapshots too).
         name: MCP server name (default ``"coffice"``).
         version: MCP server version (default ``"0.1.0"``).
 
@@ -103,6 +133,7 @@ def create_server(
         doc_path=_env_doc_path(), lo_port=_env_lo_port()
     )
     co_client = co_client or default_client()
+    tracker = round_tracker or get_tracker()
     mcp = FastMCP(
         name=name,
         instructions=SERVER_INSTRUCTIONS,
@@ -110,14 +141,17 @@ def create_server(
     # FastMCP does not expose a version kwarg; the underlying MCPServer carries
     # it and reports it in the initialize handshake (serverInfo.version).
     mcp._mcp_server.version = version  # type: ignore[attr-defined]
-    _register_tools(mcp, registry, co_client)
+    _register_tools(mcp, registry, co_client, tracker)
     return mcp
 
 
 def _register_tools(
-    mcp: FastMCP, registry: DocumentRegistry, co_client: CoClient
+    mcp: FastMCP,
+    registry: DocumentRegistry,
+    co_client: CoClient,
+    tracker: RoundTracker,
 ) -> None:
-    """Register the read tools + renderTile stub on ``mcp``.
+    """Register the read, write, and confirmation tools on ``mcp``.
 
     The closures below define the JSON-Schema input shapes agents see via
     ``tools/list`` (e.g. ``getSelection`` accepts an optional ``range``
@@ -128,7 +162,28 @@ def _register_tools(
     (e.g. LibreOffice is not installed yet) the tool returns a structured
     ``{"error": ...}`` result instead of failing the whole request, so the
     agent sees a readable explanation.
+
+    The write tools share one :class:`tools_write.WriteContext` (pending
+    confirmations, audit callback) and register the pre-round snapshot hook
+    on ``tracker``: each ``start_round`` produces exactly one
+    ``pre: <round_id>`` commit.
     """
+    write_ctx = tools_write.WriteContext(registry=registry, co_client=co_client)
+
+    def _round_snapshot_hook(round_) -> None:
+        try:
+            results = tools_write.pre_round_snapshot(round_, write_ctx)
+            logger.info(
+                "pre-round snapshot: round_id=%s results=%s",
+                round_.round_id,
+                results,
+            )
+        except Exception:  # noqa: BLE001 - a hook must never break the round
+            logger.exception(
+                "pre-round snapshot hook failed: round_id=%s", round_.round_id
+            )
+
+    tracker.add_round_start_hook(_round_snapshot_hook)
 
     def _guarded(
         handler: Callable[..., dict[str, Any]],
@@ -140,6 +195,21 @@ def _register_tools(
         except Exception as exc:  # noqa: BLE001 - surface any open/read failure
             logger.warning("read tool failed for docId=%r: %s", doc_id, exc)
             return {"docId": doc_id, "error": f"{type(exc).__name__}: {exc}"}
+
+    def _guarded_write(
+        handler: Callable[..., dict[str, Any]],
+        doc_id: str,
+        *args: Any,
+    ) -> dict[str, Any]:
+        try:
+            return handler(write_ctx, doc_id, *args)
+        except Exception as exc:  # noqa: BLE001 - surface any open/write failure
+            logger.warning("write tool failed for docId=%r: %s", doc_id, exc)
+            return {
+                "ok": False,
+                "docId": doc_id,
+                "error": f"{type(exc).__name__}: {exc}",
+            }
 
     @mcp.tool(
         name="getOutline",
@@ -238,6 +308,144 @@ def _register_tools(
         height: int = 512,
     ) -> dict[str, Any]:
         return tools_read.render_tile(docId, page, x, y, width, height)
+
+    # ------------------------------------------------------------------
+    # write tools (planning doc 4.2 write table) + confirmation helpers
+    # ------------------------------------------------------------------
+
+    @mcp.tool(
+        name="insertText",
+        description=(
+            "Insert text at a character offset into the full document text "
+            "(pos may be an integer offset or the string 'end'). Optional "
+            "style is a paragraph style name. Low risk: runs immediately "
+            "with track changes on."
+        ),
+    )
+    def insert_text(
+        docId: str = DEFAULT_DOC_ID,
+        pos: int | str = 0,
+        text: str = "",
+        style: str | None = None,
+    ) -> dict[str, Any]:
+        return _guarded_write(tools_write.insert_text, docId, pos, text, style)
+
+    @mcp.tool(
+        name="replaceRange",
+        description=(
+            "Replace the text in a range ({start, end} character offsets) "
+            "with new text. Deleting more than 50 characters is medium risk "
+            "and returns needs_confirmation; a range covering the whole "
+            "document is high risk (double confirm)."
+        ),
+    )
+    def replace_range(
+        docId: str = DEFAULT_DOC_ID,
+        range: dict[str, int] | None = None,
+        text: str = "",
+    ) -> dict[str, Any]:
+        return _guarded_write(
+            tools_write.replace_range, docId, range or {"start": 0, "end": 0}, text
+        )
+
+    @mcp.tool(
+        name="applyStyle",
+        description=(
+            "Apply a paragraph style (styleId from getStyles) to all "
+            "paragraphs in a range ({start, end} character offsets). "
+            "Low risk: runs immediately with track changes on."
+        ),
+    )
+    def apply_style(
+        docId: str = DEFAULT_DOC_ID,
+        range: dict[str, int] | None = None,
+        styleId: str = "",
+    ) -> dict[str, Any]:
+        return _guarded_write(
+            tools_write.apply_style, docId, range or {"start": 0, "end": 0}, styleId
+        )
+
+    @mcp.tool(
+        name="generateTable",
+        description=(
+            "Append a new table with rows x cols cells, optionally filled "
+            "from data (list of rows of cell values). Low risk: runs "
+            "immediately with track changes on."
+        ),
+    )
+    def generate_table(
+        docId: str = DEFAULT_DOC_ID,
+        rows: int = 2,
+        cols: int = 2,
+        data: list[list[Any]] | None = None,
+        style: str | None = None,
+    ) -> dict[str, Any]:
+        return _guarded_write(
+            tools_write.generate_table, docId, rows, cols, data, style
+        )
+
+    @mcp.tool(
+        name="refactorSection",
+        description=(
+            "Replace an entire section (sectionId is the index into "
+            "getOutline) with the given instruction output; the agent "
+            "pre-computes the replacement text and passes it as instruction. "
+            "High risk (deletes a whole section): double confirmation "
+            "required."
+        ),
+    )
+    def refactor_section(
+        docId: str = DEFAULT_DOC_ID,
+        sectionId: int = 0,
+        instruction: str = "",
+    ) -> dict[str, Any]:
+        return _guarded_write(
+            tools_write.refactor_section, docId, sectionId, instruction
+        )
+
+    @mcp.tool(
+        name="setPageLayout",
+        description=(
+            "Set page layout options: margins {top,bottom,left,right} in mm, "
+            "page_size {width,height} in mm, and columns (int). Low risk: "
+            "runs immediately."
+        ),
+    )
+    def set_page_layout(
+        docId: str = DEFAULT_DOC_ID,
+        opts: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return _guarded_write(tools_write.set_page_layout, docId, opts or {})
+
+    @mcp.tool(
+        name="confirmOp",
+        description=(
+            "Confirm a pending medium/high-risk operation returned as "
+            "{status: needs_confirmation, token} by a write tool. High-risk "
+            "operations need two confirms. On confirmation the operation "
+            "executes and returns the edit result."
+        ),
+    )
+    def confirm_op(
+        token: str,
+        docId: str = DEFAULT_DOC_ID,
+    ) -> dict[str, Any]:
+        return _guarded_write(tools_write.confirm_op, docId, token)
+
+    @mcp.tool(
+        name="rejectOp",
+        description=(
+            "Reject a pending operation (its token came from a "
+            "needs_confirmation response). The pre-op snapshot is checked "
+            "back out via co, rolling the document back to before the "
+            "operation."
+        ),
+    )
+    def reject_op(
+        token: str,
+        docId: str = DEFAULT_DOC_ID,
+    ) -> dict[str, Any]:
+        return _guarded_write(tools_write.reject_op, docId, token)
 
 
 def main() -> None:
