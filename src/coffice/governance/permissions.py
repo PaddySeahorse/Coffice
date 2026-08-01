@@ -46,6 +46,18 @@ WRITE_OPS = (
     "setPageLayout",
 )
 
+#: version-control tools (planning doc 14.3): they mutate history / the
+#: document file, so read-only agents are denied them too.
+VERSION_OPS = (
+    "snapshot",
+    "rollback",
+    "branch",
+    "merge",
+    "tag",
+    "exportDoc",
+    "importBundle",
+)
+
 #: confirmation-flow tools; confirmOp/rejectOp resolve pending ops only.
 CONFIRM_OPS = ("confirmOp", "rejectOp")
 
@@ -61,6 +73,7 @@ UNAVAILABLE_OPS = ("renderTile",)
 ALL_OPS = (
     *READ_OPS,
     *WRITE_OPS,
+    *VERSION_OPS,
     *CONFIRM_OPS,
     *DESTRUCTIVE_OPS,
     *UNAVAILABLE_OPS,
@@ -70,7 +83,7 @@ ALL_OPS = (
 def _decision(op: str, agent: AgentIdentity) -> dict[str, Any]:
     """One governance-table row for ``op`` under ``agent``'s scope."""
     scope = agent.scope
-    is_write = op in WRITE_OPS
+    is_write = op in WRITE_OPS or op in VERSION_OPS
 
     if scope.read_only and is_write:
         return {
@@ -144,6 +157,7 @@ __all__ = [
     "DESTRUCTIVE_OPS",
     "READ_OPS",
     "UNAVAILABLE_OPS",
+    "VERSION_OPS",
     "WRITE_OPS",
     "get_permissions",
     "get_permissions_tool",

@@ -38,6 +38,15 @@ per-round snapshot middleware (doc 4.1): starting a round with
 immediately before execution and require ``confirmOp``/``rejectOp``
 confirmation (see ``coffice.mcp.tools_write``).
 
+Version tools + export/import (planning doc 14.3 / ADR-005)
+----------------------------------------------------------
+The version tools (``snapshot``/``rollback``/``branch``/``merge``/``tag``)
+wire the ``co`` CLI into the agent surface, and ``exportDoc``/``importBundle``
+implement the ADR-005 export flow: pure exports by default (no ``.co/``
+embedded), a ``.co-bundle`` companion, an include-co warning dialog, optional
+``.coffice.zip`` packaging, and history restore + append (see
+``coffice.mcp.tools_version`` and ``coffice.versioning.export``).
+
 Governance (planning doc ch. 8)
 -------------------------------
 Every write tool passes through the governance :class:`WriteGuard` first:
@@ -70,7 +79,7 @@ from coffice.governance import (
 )
 from coffice.governance.audit import round_audit_callback
 from coffice.governance.permissions import get_permissions_tool
-from coffice.mcp import tools_read, tools_write
+from coffice.mcp import tools_read, tools_version, tools_write
 from coffice.mcp.middleware import RoundTracker, get_tracker
 from coffice.mcp.registry import DEFAULT_DOC_ID, DocumentRegistry
 from coffice.versioning.co_client import CoClient, default_client
@@ -90,6 +99,9 @@ SERVER_INSTRUCTIONS = (
     "version snapshots happen once per round, not per tool call. Call "
     "getPermissions {agentId} to learn your allowed operations (some "
     "destructive ops are forbidden for you and are blocked before any edit). "
+    "Version control is available through the snapshot/rollback/branch/merge/"
+    "tag tools (doc 14.3), and exportDoc/importBundle implement the ADR-005 "
+    "export flow (.co-bundle companion; PURE export by default). "
     "renderTile (AI vision) is NOT supported in the MVP."
 )
 
@@ -118,6 +130,18 @@ WRITE_TOOL_NAMES = (
 
 #: Governance tools (planning doc ch. 8), registered after the write tools.
 GOVERNANCE_TOOL_NAMES = ("getPermissions",)
+
+#: Version-control tools (planning doc 14.3 + ADR-005): manual snapshots,
+#: rollback, branch/merge/tag, and the export/import flow.
+VERSION_TOOL_NAMES = (
+    "snapshot",
+    "rollback",
+    "branch",
+    "merge",
+    "tag",
+    "exportDoc",
+    "importBundle",
+)
 
 #: default write-operation rate limit when COFFICE_WRITE_RATE_LIMIT is unset.
 DEFAULT_WRITE_RATE_LIMIT = 30
@@ -626,6 +650,148 @@ def _register_tools(
     ) -> dict[str, Any]:
         return _governed_write(
             "rejectOp", {"token": token}, docId, tools_write.reject_op, token
+        )
+
+    # ------------------------------------------------------------------
+    # version tools (planning doc 14.3) + export/import (ADR-005)
+    # ------------------------------------------------------------------
+
+    @mcp.tool(
+        name="snapshot",
+        description=(
+            "Create a manual version snapshot of the current document state "
+            "(co commit -m <label>); returns the new commit hash. The "
+            "automatic pre-round snapshot is separate -- this is for "
+            "explicit checkpoints the human asks for."
+        ),
+    )
+    def snapshot(
+        docId: str = DEFAULT_DOC_ID,
+        label: str = "",
+    ) -> dict[str, Any]:
+        return _governed_write(
+            "snapshot", {"label": label}, docId, tools_version.snapshot, label
+        )
+
+    @mcp.tool(
+        name="rollback",
+        description=(
+            "Restore the document contents to a previous commit hash "
+            "(co checkout <hash>). The on-disk document is replaced with "
+            "that snapshot's contents."
+        ),
+    )
+    def rollback(
+        docId: str = DEFAULT_DOC_ID,
+        hash: str = "",
+    ) -> dict[str, Any]:
+        return _governed_write(
+            "rollback", {"hash": hash}, docId, tools_version.rollback, hash
+        )
+
+    @mcp.tool(
+        name="branch",
+        description=(
+            "Create a named branch at the current commit (doc 14.3). Note: "
+            "upstream co does not implement branch/merge/tag; the installed "
+            "binary must advertise support."
+        ),
+    )
+    def branch(
+        docId: str = DEFAULT_DOC_ID,
+        name: str = "",
+    ) -> dict[str, Any]:
+        return _governed_write(
+            "branch", {"name": name}, docId, tools_version.branch, name
+        )
+
+    @mcp.tool(
+        name="merge",
+        description=(
+            "Merge a named branch into the current one (doc 14.3). Note: "
+            "upstream co does not implement branch/merge/tag; the installed "
+            "binary must advertise support."
+        ),
+    )
+    def merge(
+        docId: str = DEFAULT_DOC_ID,
+        branch: str = "",
+    ) -> dict[str, Any]:
+        return _governed_write(
+            "merge", {"branch": branch}, docId, tools_version.merge, branch
+        )
+
+    @mcp.tool(
+        name="tag",
+        description=(
+            "Tag the current commit with a human-readable name (doc 14.3). "
+            "Note: upstream co does not implement branch/merge/tag; the "
+            "installed binary must advertise support."
+        ),
+    )
+    def tag(
+        docId: str = DEFAULT_DOC_ID,
+        name: str = "",
+    ) -> dict[str, Any]:
+        return _governed_write(
+            "tag", {"name": name}, docId, tools_version.tag, name
+        )
+
+    @mcp.tool(
+        name="exportDoc",
+        description=(
+            "Export the document honoring ADR-005. Defaults to a PURE "
+            "export: the copy carries no .co/ version history (100% "
+            "compatible with Word/WPS) and history is written to a "
+            "<file>.co-bundle companion (includeBundle defaults to true). "
+            "includeCo: true keeps history inside the file BUT returns the "
+            "warning that Word/WPS will wipe it. package: true additionally "
+            "zips document + bundle into <file>.coffice.zip."
+        ),
+    )
+    def export_doc(
+        docId: str = DEFAULT_DOC_ID,
+        includeCo: bool = False,
+        includeBundle: bool = True,
+        path: str | None = None,
+        package: bool = False,
+    ) -> dict[str, Any]:
+        params = {
+            "includeCo": includeCo,
+            "includeBundle": includeBundle,
+            "path": path,
+            "package": package,
+        }
+        return _governed_write(
+            "exportDoc",
+            params,
+            docId,
+            tools_version.export_doc,
+            includeCo,
+            includeBundle,
+            path,
+            package,
+        )
+
+    @mcp.tool(
+        name="importBundle",
+        description=(
+            "Restore version history from a <file>.co-bundle companion onto "
+            "the document (doc 14.6 scenario B): the bundle's commits are "
+            "merged into the document's history and the current state is "
+            "appended as a new commit."
+        ),
+    )
+    def import_bundle(
+        docId: str = DEFAULT_DOC_ID,
+        bundlePath: str = "",
+    ) -> dict[str, Any]:
+        return _governed_write(
+            "importBundle",
+            {"bundlePath": bundlePath},
+            docId,
+            tools_version.import_bundle,
+            bundlePath,
         )
 
 
