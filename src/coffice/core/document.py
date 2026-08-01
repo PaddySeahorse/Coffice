@@ -172,20 +172,19 @@ class Document:
         passed directly to the range-based methods (:meth:`get_selection`,
         :meth:`replace_range`, :meth:`apply_style`).
         """
-        full = self.get_text()
         enum = self._doc.Text.createEnumeration()
         outline: list[dict[str, Any]] = []
-        search_from = 0
+        cursor = self._doc.Text.createTextCursor()
+        cursor.gotoStart(False)
         while enum.hasMoreElements():
             element = enum.nextElement()
             if not _supports_service(element, "com.sun.star.text.Paragraph"):
                 continue
             paragraph_text = str(element.String)
-            start = full.find(paragraph_text, search_from)
-            if start < 0:
-                start = search_from
             level = self._heading_level(element)
             if level is not None:
+                # Use UNO cursor position for accurate offsets
+                start = len(cursor.String)
                 outline.append(
                     {
                         "start": start,
@@ -195,7 +194,7 @@ class Document:
                         "text": paragraph_text,
                     }
                 )
-            search_from = start + len(paragraph_text)
+            cursor.goRight(len(paragraph_text), False)
         return outline
 
     def _heading_level(self, paragraph: Any) -> int | None:
