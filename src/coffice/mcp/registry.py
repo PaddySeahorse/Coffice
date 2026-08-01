@@ -79,12 +79,15 @@ class DocumentRegistry:
 
         ``getHistory``/``getDiff`` (via the co client) operate on the saved
         file, so they need the path; a created-but-unsaved document has none.
+
+        Prefers the document's current ``_path`` (updated on ``save()``) over
+        the registry's cached path to handle save-as operations correctly.
         """
-        if doc_id in self._paths:
-            return self._paths[doc_id]
         doc = self._documents.get(doc_id)
         if doc is not None:
-            return getattr(doc, "_path", None) or self._doc_path
+            return getattr(doc, "_path", None)
+        if doc_id in self._paths:
+            return self._paths[doc_id]
         return self._doc_path
 
     def registered(self) -> dict[str, str]:
