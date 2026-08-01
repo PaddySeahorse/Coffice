@@ -36,6 +36,9 @@ lint:
 run-mcp:
 	$(PY) -m coffice.mcp.server
 
+run-agent:
+	$(PY) -m coffice.agent.agent_api
+
 build-sidebar:
 	@if [ -f $(UI)/package.json ]; then npm --prefix $(UI) run build; else echo "SKIPPED: $(UI)/ is a placeholder, no package.json yet"; fi
 
