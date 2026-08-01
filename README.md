@@ -51,10 +51,13 @@ make setup        # create .venv and install Python deps (uv preferred, pip fall
 make install-co   # clone + build the co CLI (sets CO_BIN; requires cmake + C++17 toolchain)
 make lint         # ruff check
 make test         # pytest
-make run-mcp      # run the MCP server over stdio
-make build-sidebar  # build the React UI (placeholder until the UI bead lands)
-make build-oxt    # build the LibreOffice sidebar extension -> dist/Coffice.oxt
-make smoke        # end-to-end smoke test (lands in the final integration bead)
+make run-mcp       # run the MCP server over stdio
+make run-agent     # run the agent HTTP facade (chat/confirm + read endpoints)
+make run-ui        # serve the React Agent Deck on http://127.0.0.1:8787/
+make build-sidebar # build the React UI (Vite) -> ui/dist/
+make ui-test       # Vitest unit tests for the Agent Deck
+make build-oxt     # build the LibreOffice sidebar extension -> dist/Coffice.oxt
+make smoke         # end-to-end smoke test (lands in the final integration bead)
 ```
 
 The `co` CLI (version-control snapshots) is an external dependency installed by
@@ -96,9 +99,8 @@ Debian/Ubuntu, or the bundled interpreter — see `docs/route1.md`).
    the tab, or use **Tools → Coffice** (also the panel title-bar menu) to
    toggle the deck.
 3. The panel shows the Agent Deck URL it loads — by default
-   `http://127.0.0.1:8787/` (served by `make run-ui` once the UI bead lands, or
-   any static page). Override with the `COFFICE_UI_URL` environment variable or
-   `COFFICE_UI_PORT`:
+   `http://127.0.0.1:8787/` (served by `make run-ui`; see `ui/README.md`).
+   Override with the `COFFICE_UI_URL` environment variable or `COFFICE_UI_PORT`:
    ```sh
    COFFICE_UI_URL=http://localhost:3000/ soffice report.docx
    ```

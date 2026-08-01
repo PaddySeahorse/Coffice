@@ -13,6 +13,23 @@ endpoints (this is the contract the UI bead consumes):
                        reject checks out the pre-op snapshot) and resumes the
                        agent loop until it finishes.
 
+The UI bead extends this facade with read-only introspection and a generic
+in-process tool passthrough (same tool names/result shapes the MCP server
+exposes, so contracts stay aligned):
+
+- ``GET /tools``    -- registered MCP tools (name/description/inputSchema) for
+                       the Tools panel; the ``confirmOp``/``rejectOp`` helpers
+                       are hidden (they are human-only, never agent/UI listed).
+- ``POST /tool``    -- ``{"name": "...", "arguments": {...}}`` executes any
+                       registered tool in-process (read tools, exportDoc,
+                       importBundle, rollback, ...) and returns its dict result.
+                       Used by the Diff accept/reject, History rollback, Export
+                       dialog, and the Tools panel's manual read triggers.
+- ``GET /history``  -- ``co log`` timeline via the ``getHistory`` tool
+                       (``?docId=&limit=``).
+- ``GET /diff``     -- diff between two commit hashes via the ``getDiff`` tool
+                       (``?h1=&h2=&docId=``).
+
 A ``GET /health`` reports liveness. Everything else is stdlib
 ``http.server`` (a ``ThreadingHTTPServer``) so the MVP keeps dependencies
 light; swap for FastAPI in Phase 2 if needed.
@@ -30,14 +47,21 @@ and the listener port ``COFFICE_AGENT_PORT`` (default 8790, bound to
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
+import urllib.parse
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
-from coffice.agent.agent_loop import AgentSession, ChatResult
+from coffice.agent.agent_loop import (
+    HUMAN_ONLY_TOOLS,
+    AgentSession,
+    ChatResult,
+    _server_call,
+)
 from coffice.agent.llm_client import LLMClient
 from coffice.mcp.middleware import RoundTracker
 from coffice.mcp.server import create_server
@@ -171,6 +195,112 @@ def handle_confirm(
 
 
 # ============================================================================
+# read introspection + generic tool passthrough (UI bead: Tools/Diff/History/
+# Export panels). Same tool names and result shapes as the MCP server.
+# ============================================================================
+
+
+def _registered_tools(sessions: AgentSessions) -> list[dict[str, Any]]:
+    """The MCP tools the UI may list/call, as ``{name, description, inputSchema}``.
+
+    ``confirmOp``/``rejectOp`` are human-only (the chat /confirm endpoint
+    drives them); they are intentionally not exposed for direct calls.
+    """
+    tools: list[dict[str, Any]] = []
+    for tool in asyncio.run(sessions._server.list_tools()):  # noqa: SLF001
+        name = getattr(tool, "name", None)
+        if not name or name in HUMAN_ONLY_TOOLS:
+            continue
+        tools.append(
+            {
+                "name": str(name),
+                "description": str(getattr(tool, "description", "") or ""),
+                "inputSchema": dict(getattr(tool, "inputSchema", None) or {}),
+            }
+        )
+    return sorted(tools, key=lambda t: t["name"])
+
+
+def handle_tools(sessions: AgentSessions) -> tuple[int, dict[str, Any]]:
+    """Process ``GET /tools``; returns ``(status_code, payload)``."""
+    try:
+        return 200, {"ok": True, "tools": _registered_tools(sessions)}
+    except Exception as exc:  # noqa: BLE001 - surface the introspection failure
+        logger.warning("tools introspection failed: %s", exc)
+        return 500, {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+
+
+def _call_tool(sessions: AgentSessions, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    """Run one registered MCP tool in-process; raises on tool errors."""
+    return _server_call(sessions._server, name, arguments)
+
+
+def handle_tool_call(
+    sessions: AgentSessions, body: dict[str, Any]
+) -> tuple[int, dict[str, Any]]:
+    """Process a ``POST /tool`` body; returns ``(status_code, payload)``."""
+    name = body.get("name")
+    if not isinstance(name, str) or not name:
+        return 400, {"ok": False, "error": "'name' (non-empty string) is required"}
+    arguments = body.get("arguments")
+    if arguments is None:
+        arguments = {}
+    if not isinstance(arguments, dict):
+        return 400, {"ok": False, "error": "'arguments' must be a JSON object"}
+    try:
+        result = _call_tool(sessions, name, arguments)
+    except Exception as exc:  # noqa: BLE001 - structured error for any tool failure
+        logger.warning("tool call %s failed: %s", name, exc)
+        return 500, {"ok": False, "tool": name, "error": f"{type(exc).__name__}: {exc}"}
+    if not isinstance(result, dict):
+        result = {"ok": True, "result": result}
+    result.setdefault("tool", name)
+    return 200, result
+
+
+def handle_history(
+    sessions: AgentSessions, params: dict[str, Any]
+) -> tuple[int, dict[str, Any]]:
+    """Process ``GET /history`` (``co log`` timeline) via the getHistory tool."""
+    arguments: dict[str, Any] = {}
+    doc_id = params.get("docId")
+    if doc_id:
+        arguments["docId"] = doc_id
+    limit = params.get("limit")
+    if limit is not None:
+        try:
+            arguments["limit"] = int(limit)
+        except (TypeError, ValueError):
+            return 400, {"ok": False, "error": "'limit' must be an integer"}
+    try:
+        result = _call_tool(sessions, "getHistory", arguments)
+    except Exception as exc:  # noqa: BLE001 - structured error for any failure
+        logger.warning("getHistory failed: %s", exc)
+        return 500, {"ok": False, "tool": "getHistory", "error": f"{type(exc).__name__}: {exc}"}
+    return 200, result
+
+
+def handle_diff(
+    sessions: AgentSessions, params: dict[str, Any]
+) -> tuple[int, dict[str, Any]]:
+    """Process ``GET /diff`` (commit-to-commit diff) via the getDiff tool."""
+    h1 = params.get("h1")
+    h2 = params.get("h2")
+    if not h1 or not h2:
+        return 400, {"ok": False, "error": "'h1' and 'h2' commit hashes are required"}
+    arguments: dict[str, Any] = {"h1": h1, "h2": h2}
+    doc_id = params.get("docId")
+    if doc_id:
+        arguments["docId"] = doc_id
+    try:
+        result = _call_tool(sessions, "getDiff", arguments)
+    except Exception as exc:  # noqa: BLE001 - structured error for any failure
+        logger.warning("getDiff failed: %s", exc)
+        return 500, {"ok": False, "tool": "getDiff", "error": f"{type(exc).__name__}: {exc}"}
+    return 200, result
+
+
+# ============================================================================
 # http.server facade
 # ============================================================================
 
@@ -203,19 +333,36 @@ def build_handler(sessions: AgentSessions) -> type[BaseHTTPRequestHandler]:
 
         def do_POST(self) -> None:  # noqa: N802 - http.server dispatch name
             body = self._read_body()
-            if self.path.rstrip("/") == "/chat":
+            path = self.path.split("?", 1)[0].rstrip("/")
+            if path == "/chat":
                 status, payload = handle_chat(sessions, body)
-            elif self.path.rstrip("/") == "/confirm":
+            elif path == "/confirm":
                 status, payload = handle_confirm(sessions, body)
+            elif path == "/tool":
+                status, payload = handle_tool_call(sessions, body)
             else:
                 status, payload = 404, {"ok": False, "error": "not found"}
             self._send_json(status, payload)
 
         def do_GET(self) -> None:  # noqa: N802 - http.server dispatch name
-            if self.path.rstrip("/") in ("/health", "/"):
+            path, _, query = self.path.partition("?")
+            path = path.rstrip("/")
+            params = {
+                key: values[0] if values else ""
+                for key, values in urllib.parse.parse_qs(query).items()
+            }
+            if path in ("/health", "/"):
                 self._send_json(200, {"ok": True, "service": "coffice-agent"})
+                return
+            if path == "/tools":
+                status, payload = handle_tools(sessions)
+            elif path == "/history":
+                status, payload = handle_history(sessions, params)
+            elif path == "/diff":
+                status, payload = handle_diff(sessions, params)
             else:
-                self._send_json(404, {"ok": False, "error": "not found"})
+                status, payload = 404, {"ok": False, "error": "not found"}
+            self._send_json(status, payload)
 
         def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
             logger.debug("agent api: " + format, *args)
