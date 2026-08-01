@@ -187,7 +187,14 @@ def round_audit_callback(
     and rejected ops carry a commit hash); plain ``op_executed`` events are
     skipped because the doc 8.4 record is per-commit, and a low-risk edit's
     effects are captured by the round commit that follows.
+
+    To avoid calling ``co log`` + ``co diff`` on every round (which is slow for
+    large histories), the callback caches the last seen commit hash and its
+    parent/files_changed per document path.
     """
+
+    # Cache: path -> (last_commit_hash, parent_hash, files_changed)
+    _context_cache: dict[str, tuple[str, str | None, list[str]]] = {}
 
     def callback(event: dict[str, Any]) -> None:
         try:
@@ -198,9 +205,18 @@ def round_audit_callback(
                     return
                 doc_id = event.get("doc_id") or "default"
                 path = registry.path(doc_id) if registry else None
-                parent, files_changed = _commit_context(
-                    co_client, path, str(commit_hash)
-                )
+                if not path:
+                    return
+
+                # Check cache first
+                cached = _context_cache.get(path)
+                if cached and cached[0] == commit_hash:
+                    parent, files_changed = cached[1], cached[2]
+                else:
+                    parent, files_changed = _commit_context(co_client, path, str(commit_hash))
+                    # Update cache
+                    _context_cache[path] = (str(commit_hash), parent, files_changed)
+
                 audit_log.record(
                     hash=str(commit_hash),
                     author=str(event.get("agent_id") or getattr(ctx, "author", "AI-Writer")),
