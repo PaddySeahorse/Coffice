@@ -43,7 +43,9 @@ export function ChatPanel({ messages, busy, onSend, onConfirm }: ChatPanelProps)
                   ? "You"
                   : message.role === "assistant"
                     ? "AI"
-                    : "System"}
+                    : message.role === "tool"
+                      ? "Tool"
+                      : "System"}
               </header>
               <div className="chat-message__content">{message.content}</div>
               {message.toolSummary && (
