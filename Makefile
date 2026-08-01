@@ -6,7 +6,7 @@ PY := $(BIN)/python
 PIP := $(BIN)/pip
 UI := ui
 
-.PHONY: setup install-co test lint run-mcp build-sidebar build-oxt install-oxt smoke
+.PHONY: setup install-co test lint run-mcp run-agent run-ui build-sidebar ui-test build-oxt install-oxt smoke
 
 setup:
 	@if command -v $(UV) >/dev/null 2>&1; then \
@@ -39,8 +39,19 @@ run-mcp:
 run-agent:
 	$(PY) -m coffice.agent.agent_api
 
+# The Agent Deck UI: served on http://127.0.0.1:8787/ (the origin the sidebar
+# shell loads, src/coffice/sidebar/contract.py DEFAULT_UI_PORT). Vite reads
+# COFFICE_UI_PORT too, matching the shell's override.
+run-ui:
+	@if [ -f $(UI)/package.json ]; then npm --prefix $(UI) run dev; \
+	else echo "SKIPPED: $(UI)/ has no package.json yet"; fi
+
 build-sidebar:
 	@if [ -f $(UI)/package.json ]; then npm --prefix $(UI) run build; else echo "SKIPPED: $(UI)/ is a placeholder, no package.json yet"; fi
+
+ui-test:
+	@if [ -f $(UI)/package.json ]; then npm --prefix $(UI) test; \
+	else echo "SKIPPED: $(UI)/ has no package.json yet"; fi
 
 build-oxt:
 	@bash extension/build.sh
