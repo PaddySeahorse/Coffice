@@ -265,10 +265,15 @@ class Document:
         ``style`` is a paragraph style name applied to the inserted text.
         Returns the character offset just after the inserted text.
         """
+        doc_len = len(self.get_text())
         if pos == "end" or pos is None:
-            offset = len(self.get_text())
+            offset = doc_len
         else:
             offset = int(pos)
+            if offset < 0 or offset > doc_len:
+                raise DocumentError(
+                    f"insert position {offset} out of bounds [0, {doc_len}]"
+                )
         cursor = self._doc.Text.createTextCursor()
         cursor.gotoStart(False)
         cursor.goRight(offset, False)
