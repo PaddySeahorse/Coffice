@@ -174,8 +174,7 @@ class Document:
         """
         enum = self._doc.Text.createEnumeration()
         outline: list[dict[str, Any]] = []
-        cursor = self._doc.Text.createTextCursor()
-        cursor.gotoStart(False)
+        offset = 0
         while enum.hasMoreElements():
             element = enum.nextElement()
             if not _supports_service(element, "com.sun.star.text.Paragraph"):
@@ -183,18 +182,18 @@ class Document:
             paragraph_text = str(element.String)
             level = self._heading_level(element)
             if level is not None:
-                # Use UNO cursor position for accurate offsets
-                start = len(cursor.String)
+                # Offsets are accumulated per paragraph, so repeated heading
+                # text never confuses the position (no full-text search).
                 outline.append(
                     {
-                        "start": start,
-                        "end": start + len(paragraph_text),
+                        "start": offset,
+                        "end": offset + len(paragraph_text),
                         "level": level,
                         "style": str(element.ParagraphStyleName),
                         "text": paragraph_text,
                     }
                 )
-            cursor.goRight(len(paragraph_text), False)
+            offset += len(paragraph_text)
         return outline
 
     def _heading_level(self, paragraph: Any) -> int | None:
