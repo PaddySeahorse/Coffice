@@ -504,6 +504,12 @@ class CoClient:
                 args += ["--external", bundle]
             proc = self._run("log", args)
             return self._parse_log_json(proc.stdout, limit)
+        # Fallback: text output is brittle; log a warning so operators know
+        # history parsing may be incomplete if the upstream binary changes format.
+        logger.warning(
+            "co log --json not supported; falling back to text parsing which "
+            "may break if the upstream binary changes its output format"
+        )
         args = [path]
         if bundle:
             args += ["--external", bundle]
@@ -645,12 +651,20 @@ class CoClient:
             if line.startswith("    "):
                 message_lines.append(line[4:])
                 continue
+            # Skip empty lines between message paragraphs
             if line == "" and message_lines and message_lines[-1] == "":
                 continue
         if current is not None:
             commits.append(self._build_commit(current, message_lines))
         if limit is not None:
             commits = commits[:limit]
+        if not commits and stdout.strip():
+            # Non-empty output but no commits parsed -- log for debugging
+            logger.warning(
+                "co log text parsing returned 0 commits; output may have "
+                "changed format. Raw output (first 500 chars): %s",
+                stdout[:500],
+            )
         return commits
 
     @staticmethod
