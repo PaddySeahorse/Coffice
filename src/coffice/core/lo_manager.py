@@ -197,10 +197,17 @@ class LoManager:
         return False
 
     def ping(self, timeout: float = 2.0) -> bool:
-        """Health-check the instance: process alive *and* port accepting."""
+        """Health-check the instance: process alive, port accepting, and UNO responsive."""
         if self._process is not None and self._process.poll() is not None:
             return False
-        return self._port_open(timeout=timeout)
+        if not self._port_open(timeout=timeout):
+            return False
+        # Verify UNO bridge is actually responsive with a lightweight call
+        try:
+            self.get_component_context()
+            return True
+        except Exception:
+            return False
 
     # -- lifecycle ------------------------------------------------------------
 
