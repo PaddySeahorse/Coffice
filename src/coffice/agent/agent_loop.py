@@ -426,6 +426,19 @@ class AgentSession:
         )
 
     def _apply_tool_call(self, tool_call: ToolCall) -> dict[str, Any]:
+        # Validate tool name against registered tools to catch hallucinations early
+        known_tools = {spec.name for spec in self._executor.list_tools()}
+        if tool_call.name not in known_tools:
+            logger.warning(
+                "session %s: unknown tool %s (not in registered tools)",
+                self.session_id,
+                tool_call.name,
+            )
+            return {
+                "ok": False,
+                "tool": tool_call.name,
+                "error": f"unknown tool '{tool_call.name}'; available tools: {sorted(known_tools)}",
+            }
         logger.info(
             "session %s: executing tool %s(%s)",
             self.session_id,
