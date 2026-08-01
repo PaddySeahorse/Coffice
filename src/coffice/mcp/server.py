@@ -348,14 +348,18 @@ def _register_tools(
 
         The guard resolves the (possibly not-yet-opened) document lazily so a
         protected-region overlap can be detected before the edit; if the
-        document cannot be opened the guard proceeds and the write tool itself
-        returns the structured open error.
+        document cannot be opened the guard fails closed to prevent bypass.
         """
         doc = None
         try:
             doc = registry.get(doc_id)
-        except Exception:  # noqa: BLE001 - the write tool reports open errors
-            logger.debug("governance guard: doc not openable for %r", doc_id)
+        except Exception as exc:  # noqa: BLE001 - fail closed if doc cannot be opened
+            logger.warning("governance guard: cannot open doc for %r: %s", doc_id, exc)
+            return {
+                "ok": False,
+                "docId": doc_id,
+                "error": f"DocumentNotOpenable: {exc}",
+            }
         blocked = write_guard.check(AI_WRITER_ID, op, params, doc, doc_id)
         if blocked is not None:
             return blocked
