@@ -191,10 +191,10 @@ class LoManager:
             return False
 
     def is_running(self) -> bool:
-        """True when the tracked process is alive or the UNO port is open."""
+        """True when the tracked process is alive AND the UNO port is open."""
         if self._process is not None and self._process.poll() is None:
-            return True
-        return self._port_open()
+            return self._port_open()
+        return False
 
     def ping(self, timeout: float = 2.0) -> bool:
         """Health-check the instance: process alive *and* port accepting."""
