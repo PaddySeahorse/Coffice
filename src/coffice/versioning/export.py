@@ -233,10 +233,17 @@ def export_document(
         elif not same_file:
             # PURE export to a distinct copy: strip .co/ (temp + atomic move).
             strip_co_from_zip(src, out)
-        # else: PURE export where out is the source itself -- leave the
-        # source untouched. Stripping its embedded history in place with no
-        # co CLI would destroy the document's version history (ADR-005); the
-        # .co-bundle companion written above carries it instead.
+        else:
+            # PURE export where out is the source itself: refuse without co CLI.
+            # ADR-005: history must never live only inside the file. If we strip
+            # .co/ in-place without the CLI, Word/WPS could wipe it on next save.
+            # With the CLI, co export handles this correctly. Without it, we must
+            # fail closed to prevent silent history loss.
+            raise CoError(
+                "PURE export to the same file requires the co CLI to safely "
+                "strip .co/ history. Install co via scripts/install_co.sh, or "
+                "export to a different path (out_path != src)."
+            )
 
     package_path: str | None = None
     if package:
