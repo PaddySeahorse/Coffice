@@ -89,7 +89,11 @@ def _live_write_server(desktop, tmp_path: Path) -> tuple[FastMCP, DocumentRegist
     """Build a server on a saved live document, with the fake co binary."""
     doc_path = tmp_path / "write.odt"
     doc = Document.create(desktop)
-    doc.insert_text(0, "## Report\nBody of the report goes here.\n## Notes\nA note.")
+    doc.insert_text(
+        0,
+        "## Report\nBody of the report goes here. "
+        "This sentence makes the body longer.\n## Notes\nA note.",
+    )
     doc.save(str(doc_path))
     registry = DocumentRegistry(
         doc_path=str(doc_path),
