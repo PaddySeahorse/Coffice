@@ -1,9 +1,16 @@
 # Coffice
 
+![CI](https://github.com/PaddySeahorse/Coffice/actions/workflows/ci.yml/badge.svg)
+![License](https://img.shields.io/badge/license-AGPL--3.0-orange.svg)
+
 Coffice is an AI-first office suite: LibreOffice as the rendering core, a Python
 MCP server bridging an LLM agent to the document via PyUNO, and the `co` CLI
 (<https://github.com/PaddySeahorse/co>) providing Git-style version-control
 snapshots.
+
+> Full integration guide (prerequisites, quickstart, architecture mapping to
+> the planning doc chapters, MVP scope boundaries, known limitations): see
+> [`docs/route1.md`](docs/route1.md).
 
 ## Route 1 (MVP, Phase 1) scope
 
@@ -47,18 +54,22 @@ Python package layout under `src/coffice/`:
 ## Getting started
 
 ```sh
-make setup        # create .venv and install Python deps (uv preferred, pip fallback)
+make setup        # create .venv, install Python deps, and npm install the Agent Deck UI
 make install-co   # clone + build the co CLI (sets CO_BIN; requires cmake + C++17 toolchain)
 make lint         # ruff check
 make test         # pytest
-make run-mcp       # run the MCP server over stdio
-make run-agent     # run the agent HTTP facade (chat/confirm + read endpoints)
-make run-ui        # serve the React Agent Deck on http://127.0.0.1:8787/
+make run-mcp      # run the MCP server over stdio
+make run-agent    # run the agent HTTP facade (chat/confirm + read endpoints)
+make run-ui       # serve the React Agent Deck on http://127.0.0.1:8787/
 make build-sidebar # build the React UI (Vite) -> ui/dist/
-make ui-test       # Vitest unit tests for the Agent Deck
-make build-oxt     # build the LibreOffice sidebar extension -> dist/Coffice.oxt
-make smoke         # end-to-end smoke test (lands in the final integration bead)
+make ui-test      # Vitest unit tests for the Agent Deck
+make build-oxt    # build the LibreOffice sidebar extension -> dist/Coffice.oxt
+make smoke        # end-to-end Route 1 smoke test (skips gracefully when LO/co are absent)
 ```
+
+The LLM endpoint is configured via `COFFICE_LLM_BASE_URL` /
+`COFFICE_LLM_MODEL` / `COFFICE_LLM_API_KEY` (Ollama, LM Studio, or any
+OpenAI-compatible cloud API — see `docs/route1.md` §1.4).
 
 The `co` CLI (version-control snapshots) is an external dependency installed by
 `make install-co` / `scripts/install_co.sh` (binary lands in `~/.local/bin/co`).
