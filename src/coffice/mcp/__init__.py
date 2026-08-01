@@ -17,6 +17,7 @@ from coffice.mcp.server import (
     SERVER_INSTRUCTIONS,
     SERVER_NAME,
     SERVER_VERSION,
+    VERSION_TOOL_NAMES,
     WRITE_TOOL_NAMES,
     create_server,
 )
@@ -35,6 +36,7 @@ __all__ = [
     "SERVER_INSTRUCTIONS",
     "SERVER_NAME",
     "SERVER_VERSION",
+    "VERSION_TOOL_NAMES",
     "WRITE_TOOL_NAMES",
     "RiskLevel",
     "Round",
