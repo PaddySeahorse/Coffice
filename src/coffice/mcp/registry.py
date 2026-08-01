@@ -85,7 +85,9 @@ class DocumentRegistry:
         """
         doc = self._documents.get(doc_id)
         if doc is not None:
-            return getattr(doc, "_path", None)
+            doc_path = getattr(doc, "_path", None)
+            if doc_path:
+                return doc_path
         if doc_id in self._paths:
             return self._paths[doc_id]
         return self._doc_path
