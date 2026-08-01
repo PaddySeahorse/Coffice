@@ -8,7 +8,7 @@ UI := ui
 
 .PHONY: setup install-co test lint run-mcp run-agent run-ui build-sidebar ui-test build-oxt install-oxt smoke
 
-setup:
+setup: ## Create .venv, install Python deps, and npm install the Agent Deck UI
 	@if command -v $(UV) >/dev/null 2>&1; then \
 		echo "Using uv for setup"; \
 		$(UV) venv $(VENV); \
@@ -21,6 +21,12 @@ setup:
 		echo "ERROR: neither 'uv' nor 'python3 -m pip' is available."; \
 		echo "Install uv (https://docs.astral.sh/uv/) or ensure python3-pip is installed."; \
 		exit 1; \
+	fi
+	@if [ -f $(UI)/package.json ]; then \
+		echo "Installing Agent Deck UI dependencies"; \
+		npm --prefix $(UI) install; \
+	else \
+		echo "SKIPPED: $(UI)/ has no package.json yet"; \
 	fi
 	@echo "Setup complete. Activate with: source $(VENV)/bin/activate"
 
@@ -64,5 +70,5 @@ install-oxt:
 		echo "  unopkg add dist/Coffice.oxt"; \
 	fi
 
-smoke:
-	@if [ -f scripts/smoke_route1.sh ]; then bash scripts/smoke_route1.sh; else echo "SKIPPED: scripts/smoke_route1.sh lands in the final integration bead"; fi
+smoke: ## End-to-end Route 1 smoke test (skips gracefully when LO/co are absent)
+	@bash scripts/smoke_route1.sh

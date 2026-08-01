@@ -28,3 +28,23 @@ jobs:
 
       - name: Test
         run: uv run pytest
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install UI dependencies
+        run: npm --prefix ui ci
+
+      - name: Build Agent Deck UI
+        run: npm --prefix ui run build
+
+      - name: UI tests
+        run: npm --prefix ui test
+
+      - name: Build LibreOffice extension
+        run: bash extension/build.sh
+
+      - name: Route 1 smoke test (skips when LO/co are unavailable)
+        run: bash scripts/smoke_route1.sh
