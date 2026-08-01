@@ -2,8 +2,8 @@
 
 The registry's document factory is swapped for one that returns
 :class:`FakeDocument`, so tool-result shaping can be tested in memory; the
-co client is swapped for :class:`FakeCoClient` so getHistory/getDiff run
-without the real ``co`` binary.
+co client is swapped for :class:`FakeCoClient` so getHistory/getDiff (and the
+write-tools snapshot/rollback calls) run without the real ``co`` binary.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import pytest
 
 from coffice.core.lo_manager import LoManager
 from coffice.mcp.registry import DEFAULT_DOC_ID, DocumentRegistry
-from coffice.versioning.co_client import CommitInfo, DiffEntry
+from coffice.versioning.co_client import CheckoutResult, CommitInfo, DiffEntry
 
 
 @pytest.fixture
@@ -149,6 +149,37 @@ class FakeCoClient:
         if self._raise_error:
             raise RuntimeError("co binary not available")
         return self._diffs
+
+    def commit(
+        self,
+        path: str,
+        message: str,
+        author: str | None = None,
+        human_operator: str | None = None,
+        author_email: str | None = None,
+        bundle: str | None = None,
+    ) -> str:
+        self.calls.append(("commit", (path, message)))
+        if self._raise_error:
+            raise RuntimeError("co binary not available")
+        hash_ = f"c{len(self._commits) + 1:06x}"
+        self._commits.append(
+            CommitInfo(
+                hash=hash_,
+                author=author or "AI-Writer",
+                message=message,
+                timestamp="2026-08-01T00:00:00+00:00",
+            )
+        )
+        return hash_
+
+    def checkout(
+        self, path: str, hash: str, bundle: str | None = None
+    ) -> CheckoutResult:
+        self.calls.append(("checkout", (path, hash)))
+        if self._raise_error:
+            raise RuntimeError("co binary not available")
+        return CheckoutResult(hash=hash)
 
 
 @pytest.fixture()
