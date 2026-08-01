@@ -54,6 +54,7 @@ to parsing the git-style text output.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import shutil
@@ -64,6 +65,8 @@ from datetime import UTC
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 #: Stable, machine-readable warning surfaced when a document export keeps .co/
 #: history inside the file (ADR-005).
