@@ -302,6 +302,25 @@ def test_export_pure_fallback_never_contains_co(no_co_server: FastMCP, tmp_path:
     assert "word/document.xml" in names
 
 
+def test_export_no_path_fallback_does_not_corrupt_source(
+    no_co_server: FastMCP, version_doc: Path
+) -> None:
+    """Regression (PR #8): exportDoc with no path on a no-CLI server must not
+    truncate the source document, and the bundle must still carry history."""
+    before = version_doc.read_bytes()
+    result = call_tool(no_co_server, "exportDoc", {"docId": DEFAULT_DOC_ID})
+    assert result["ok"] is True
+    assert result["includeCo"] is False
+    assert result["path"] == str(version_doc)
+    # the source is intact and still a readable zip
+    assert version_doc.read_bytes() == before
+    assert "word/document.xml" in zip_names(version_doc)
+    # the bundle companion carries the source's .co/ history
+    bundle = result["bundlePath"]
+    assert bundle and Path(bundle).exists()
+    assert any(name.startswith(".co/") for name in zip_names(bundle))
+
+
 def test_export_include_co_fallback_keeps_history(no_co_server: FastMCP, tmp_path: Path) -> None:
     out = tmp_path / "withco.docx"
     result = call_tool(
@@ -395,3 +414,37 @@ def test_import_bundle_requires_bundle_path(version_server: FastMCP) -> None:
     result = call_tool(version_server, "importBundle", {"docId": DEFAULT_DOC_ID, "bundlePath": ""})
     assert result["ok"] is False
     assert "bundlePath" in result["error"]
+
+
+def test_import_bundle_no_cli_fallback_reports_restore(
+    no_co_server: FastMCP, version_doc: Path, tmp_path: Path
+) -> None:
+    """No co CLI: importBundle restores the bundle's .co/ entries and reports
+    the degraded outcome (history restored, no commit appended) instead of a
+    silent zero-count success."""
+    out = tmp_path / "exported.docx"
+    exported = call_tool(
+        no_co_server, "exportDoc", {"docId": DEFAULT_DOC_ID, "path": str(out)}
+    )
+    bundle_path = exported["bundlePath"]
+    assert bundle_path and Path(bundle_path).exists()
+
+    fresh = make_zip_docx(tmp_path / "fresh.docx")
+    fresh_registry = DocumentRegistry(
+        doc_path=str(fresh),
+        factory=lambda doc_id, path: FakeVersionDocument(),
+    )
+    missing = CoClient(bin_path=str(tmp_path / "missing-co"))
+    fresh_server = create_server(
+        registry=fresh_registry, co_client=missing, round_tracker=RoundTracker()
+    )
+    imported = call_tool(
+        fresh_server,
+        "importBundle",
+        {"docId": DEFAULT_DOC_ID, "bundlePath": bundle_path},
+    )
+    assert imported["ok"] is True
+    assert imported["importedCommits"] > 0
+    assert imported["commit"] is None
+    assert "without co CLI" in imported["warning"]
+    assert any(name.startswith(".co/") for name in zip_names(fresh))

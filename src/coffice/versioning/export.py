@@ -20,7 +20,8 @@ tools (doc 14.3) and the sidebar export dialog (doc 14.6) build on:
   scenario B) via ``co import`` (with an automatic ``--force`` retry when the
   bundle's recorded source SHA no longer matches -- e.g. after Word/WPS
   rewrote the file), otherwise by injecting the bundle's ``.co/`` entries
-  into the ZIP. The current document state is appended as a new commit.
+  into the ZIP. With the CLI the current document state is appended as a new
+  commit; without it the result carries a warning instead.
 """
 
 from __future__ import annotations
@@ -36,12 +37,21 @@ from coffice.versioning.co_client import (
     INCLUDE_CO_WARNING,
     CoClient,
     CoError,
+    CoNotAvailableError,
 )
 
 logger = logging.getLogger(__name__)
 
 #: zip-internal directory the co CLI uses to store version history.
 CO_DIR_PREFIX = ".co/"
+
+#: warning returned by the no-CLI import fallback: history is restored but
+#: the current state cannot be appended as a new commit.
+NO_CLI_IMPORT_WARNING = (
+    "history restored without co CLI; the current document state was not "
+    "appended as a new commit (install co via scripts/install_co.sh for "
+    "full import semantics)"
+)
 
 
 @dataclass(frozen=True)
@@ -62,7 +72,9 @@ class ImportFlowResult:
     bundle_path: str
     imported_commits: int  #: number of commits restored from the bundle
     commit_hash: str | None  #: hash of the appended current-state commit
-    warning: str = ""  #: non-empty when a forced (SHA-mismatch) import ran
+    #: non-empty when the import degraded: a forced (SHA-mismatch) retry ran,
+    #: or no co CLI was available (history restored but no commit appended).
+    warning: str = ""
 
 
 def _co_entries(names: list[str]) -> list[str]:
@@ -75,15 +87,22 @@ def strip_co_from_zip(src: Path, dst: Path) -> None:
 
     Fallback used when the co CLI is unavailable: produces a copy that is
     byte-compatible with any editor because the version history directory is
-    removed.
+    removed. The stripped copy is written to a temp file and atomically moved
+    over ``dst`` (mirroring :func:`inject_co_entries`), so ``dst == src`` is
+    safe -- the source is never truncated mid-copy.
     """
-    with zipfile.ZipFile(src) as zin, zipfile.ZipFile(
-        dst, "w", zipfile.ZIP_DEFLATED
-    ) as zout:
-        for info in zin.infolist():
-            if info.filename.startswith(CO_DIR_PREFIX):
-                continue
-            zout.writestr(info, zin.read(info.filename))
+    tmp = dst.with_name(dst.name + ".co-export.tmp")
+    try:
+        with zipfile.ZipFile(src) as zin, zipfile.ZipFile(
+            tmp, "w", zipfile.ZIP_DEFLATED
+        ) as zout:
+            for info in zin.infolist():
+                if info.filename.startswith(CO_DIR_PREFIX):
+                    continue
+                zout.writestr(info, zin.read(info.filename))
+        shutil.move(str(tmp), dst)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def write_bundle_from_co_dir(src: Path, bundle_path: Path) -> bool:
@@ -104,11 +123,13 @@ def write_bundle_from_co_dir(src: Path, bundle_path: Path) -> bool:
     return True
 
 
-def inject_co_entries(doc_path: Path, bundle_path: Path) -> None:
+def inject_co_entries(doc_path: Path, bundle_path: Path) -> int:
     """Fallback import: write the bundle's ``.co/`` entries into the doc ZIP.
 
     Used when the co CLI is unavailable. Preserves every existing ZIP entry
-    and adds the history entries the bundle carries.
+    and adds the history entries the bundle carries. Returns the number of
+    ``.co/`` entries injected (a bundle without history raises
+    :class:`ValueError` instead).
     """
     with zipfile.ZipFile(bundle_path) as zin:
         co_data = {
@@ -133,6 +154,7 @@ def inject_co_entries(doc_path: Path, bundle_path: Path) -> None:
         shutil.move(str(tmp), doc_path)
     finally:
         tmp.unlink(missing_ok=True)
+    return len(co_data)
 
 
 def export_document(
@@ -195,16 +217,26 @@ def export_document(
 
     if not co_did_export:
         # Own implementation: no co CLI (or bundle not requested).
-        if include_co:
-            if os.path.abspath(src) != os.path.abspath(out):
-                shutil.copy2(src, out)
-            warnings.append(INCLUDE_CO_WARNING)
-        else:
-            strip_co_from_zip(src, out)
+        # Capture the source's .co/ history first (ADR-005): the bundle
+        # companion must be written even when the export targets the source
+        # file itself, so history never lives only in the (rewritten) file.
         if include_bundle:
             candidate = Path(f"{out}.co-bundle")
             if write_bundle_from_co_dir(src, candidate):
                 bundle_path = str(candidate)
+
+        same_file = os.path.abspath(src) == os.path.abspath(out)
+        if include_co:
+            if not same_file:
+                shutil.copy2(src, out)
+            warnings.append(INCLUDE_CO_WARNING)
+        elif not same_file:
+            # PURE export to a distinct copy: strip .co/ (temp + atomic move).
+            strip_co_from_zip(src, out)
+        # else: PURE export where out is the source itself -- leave the
+        # source untouched. Stripping its embedded history in place with no
+        # co CLI would destroy the document's version history (ADR-005); the
+        # .co-bundle companion written above carries it instead.
 
     package_path: str | None = None
     if package:
@@ -239,8 +271,11 @@ def import_bundle(
 
     When the co CLI is available, ``co import`` runs (retried with
     ``--force`` if the bundle's recorded source SHA no longer matches -- the
-    Word/WPS rewrite case from ADR-005); otherwise the bundle's ``.co/``
-    entries are injected directly into the ZIP.
+    Word/WPS rewrite case from ADR-005) and the current state is appended as
+    a new commit; otherwise (no client, or the CLI is not installed) the
+    bundle's ``.co/`` entries are injected directly into the ZIP. The no-CLI
+    fallback cannot append a commit, so the result carries a warning and
+    reports the number of injected ``.co/`` entries instead of a commit hash.
     """
     doc = Path(doc_path)
     bundle = Path(bundle_path)
@@ -257,10 +292,15 @@ def import_bundle(
         except CoError:
             before = 0
 
+    injected = 0
     if co_client is not None:
         try:
             result = co_client.import_bundle(str(doc), str(bundle), force=False)
             warning = result.warning
+        except CoNotAvailableError:
+            logger.info("co CLI unavailable; importing bundle via ZIP injection")
+            injected = inject_co_entries(doc, bundle)
+            warning = NO_CLI_IMPORT_WARNING
         except CoError as exc:
             logger.info(
                 "co import refused without --force (%s); retrying forced "
@@ -274,13 +314,17 @@ def import_bundle(
                 "SHA no longer matched (Word/WPS may have rewritten it)"
             )
     else:
-        inject_co_entries(doc, bundle)
+        injected = inject_co_entries(doc, bundle)
+        warning = NO_CLI_IMPORT_WARNING
 
-    after = len(co_client.log(str(doc))) if co_client is not None else 0
-    imported = max(0, after - before)
+    if co_client is not None and not injected:
+        after = len(co_client.log(str(doc)))
+        imported = max(0, after - before)
+    else:
+        imported = injected
 
     commit_hash: str | None = None
-    if co_client is not None:
+    if co_client is not None and not injected:
         commit_hash = co_client.commit(
             str(doc),
             f"import: {bundle.name}",
