@@ -401,7 +401,10 @@ class AgentSession:
         return ChatResult(
             status="error",
             reply="",
-            error=f"tool loop exceeded max_tool_calls ({self.max_tool_calls}); the agent's work was cut off",
+            error=(
+                f"tool loop exceeded max_tool_calls ({self.max_tool_calls}); "
+                "the agent's work was cut off"
+            ),
             change_summary=list(self._change_summary),
             round_id=self._round.round_id if self._round else None,
         )
