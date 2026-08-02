@@ -53,6 +53,34 @@ Python package layout under `src/coffice/`:
 
 ## Getting started
 
+### macOS and Windows
+
+The Python runtime, LibreOffice bridge, UI, and `co` client support macOS and
+Windows. Install Python 3.11+, LibreOffice, Node.js 20+, CMake, and a C++17
+toolchain using the platform's package manager or installers. Set
+`COFFICE_SOFFICE_BIN` when LibreOffice is installed in a non-standard location.
+
+On macOS, the default LibreOffice application path is detected automatically.
+On Windows, `soffice.exe` and `co.exe` are detected from `PATH`, standard
+LibreOffice locations, and `%LOCALAPPDATA%`. The Windows Python commands use
+`.venv\\Scripts\\python.exe` rather than the Unix `.venv/bin` paths used by the
+Makefile:
+
+```powershell
+py -3.11 -m venv .venv
+.venv\\Scripts\\python.exe -m pip install -e ".[dev]"
+.venv\\Scripts\\python.exe -m pytest
+npm --prefix ui ci
+npm --prefix ui run build
+```
+
+Build the extension from Git Bash with `bash extension/build.sh`, or run that
+script in the shell provided by your LibreOffice/Unix compatibility layer.
+Windows users can install `co` with
+`powershell -ExecutionPolicy Bypass -File scripts\\install_co.ps1` and set
+`CO_BIN` to the resulting `co.exe`. `make install-co` remains the simplest path
+on macOS and Linux.
+
 ```sh
 make setup        # create .venv, install Python deps, and npm install the Agent Deck UI
 make install-co   # clone + build the co CLI (sets CO_BIN; requires cmake + C++17 toolchain)

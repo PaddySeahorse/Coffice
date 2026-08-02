@@ -36,6 +36,14 @@ def test_connection_metadata_format() -> None:
     )
 
 
+def test_build_command_uses_a_file_uri_for_the_profile(tmp_path) -> None:
+    manager = LoManager(soffice_bin=str(tmp_path / "soffice"))
+    manager._soffice_bin = str(tmp_path / "soffice")
+    (tmp_path / "soffice").write_text("")
+    command = manager._build_command(str(tmp_path / "lo profile"))
+    assert command[7] == f"-env:UserInstallation={(tmp_path / 'lo profile').as_uri()}"
+
+
 def test_find_soffice_binary_prefers_env(tmp_path, monkeypatch) -> None:
     fake = tmp_path / "soffice"
     fake.write_text("#!/bin/sh\nexit 0\n")

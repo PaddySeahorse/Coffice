@@ -34,6 +34,7 @@ import os
 import shutil
 import socket
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -63,6 +64,49 @@ _BUNDLED_PYTHON_CANDIDATES = (
 )
 
 
+def _platform_candidates(*relative_paths: str) -> list[Path]:
+    """Return installation paths for the current desktop platform."""
+    candidates: list[Path] = []
+    if os.name == "nt":
+        roots = [
+            os.environ.get("PROGRAMFILES"),
+            os.environ.get("PROGRAMFILES(X86)"),
+            os.environ.get("LOCALAPPDATA"),
+        ]
+        for root in filter(None, roots):
+            candidates.extend(Path(root) / path for path in relative_paths)
+    elif sys.platform == "darwin":
+        candidates.extend(Path("/Applications") / path for path in relative_paths)
+        candidates.extend(Path.home() / "Applications" / path for path in relative_paths)
+    return candidates
+
+
+def _soffice_candidates() -> list[Path]:
+    candidates = [Path(path) for path in _SOFFICE_CANDIDATES]
+    candidates.extend(
+        _platform_candidates(
+            "LibreOffice.app/Contents/MacOS/soffice",
+            "LibreOffice.app/Contents/MacOS/libreoffice",
+            "LibreOffice/program/soffice.exe",
+            "LibreOffice/program/soffice.com",
+        )
+    )
+    return candidates
+
+
+def _bundled_python_candidates() -> list[Path]:
+    candidates = [Path(path) for path in _BUNDLED_PYTHON_CANDIDATES]
+    candidates.extend(
+        _platform_candidates(
+            "LibreOffice.app/Contents/MacOS/python",
+            "LibreOffice.app/Contents/Resources/python",
+            "LibreOffice/program/python.exe",
+            "LibreOffice/program/python.bin",
+        )
+    )
+    return candidates
+
+
 def find_soffice_binary() -> str | None:
     """Locate the ``soffice`` executable.
 
@@ -76,9 +120,9 @@ def find_soffice_binary() -> str | None:
         found = shutil.which(name)
         if found:
             return found
-    for candidate in _SOFFICE_CANDIDATES:
-        if os.path.isfile(candidate):
-            return candidate
+    for candidate in _soffice_candidates():
+        if candidate.is_file():
+            return str(candidate)
     return None
 
 
@@ -87,7 +131,7 @@ def find_bundled_python() -> str | None:
 
     Returns the path to ``program/python`` inside the LO install, or ``None``.
     """
-    candidates: list[Path] = [Path(c) for c in _BUNDLED_PYTHON_CANDIDATES]
+    candidates = _bundled_python_candidates()
     soffice = find_soffice_binary()
     if soffice:
         resolved = Path(soffice).resolve()
@@ -226,7 +270,7 @@ class LoManager:
             "--nologo",
             "--nodefault",
             "--nofirststartwizard",
-            f"-env:UserInstallation=file://{profile_dir}",
+            f"-env:UserInstallation={Path(profile_dir).resolve().as_uri()}",
             "--accept",
             self.accept_string,
         ]

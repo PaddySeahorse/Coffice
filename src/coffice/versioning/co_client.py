@@ -272,10 +272,24 @@ def resolve_bin_path() -> str | None:
         candidate = os.environ.get(env_var)
         if candidate and os.path.isfile(candidate):
             return candidate
-    found = shutil.which("co")
-    if found:
-        return found
-    for common in (Path.home() / ".local/bin/co", Path("/usr/local/bin/co")):
+    for name in ("co", "co.exe"):
+        found = shutil.which(name)
+        if found:
+            return found
+    common_paths = [Path.home() / ".local/bin/co", Path("/usr/local/bin/co")]
+    if os.name == "nt":
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            common_paths.extend(
+                [
+                    Path(local_app_data) / "co" / "co.exe",
+                    Path(local_app_data) / "bin" / "co.exe",
+                ]
+            )
+        common_paths.extend(
+            [Path.home() / ".local/bin/co.exe", Path.home() / "AppData/Local/co/co.exe"]
+        )
+    for common in common_paths:
         if common.is_file():
             return str(common)
     return None
@@ -288,7 +302,9 @@ def co_available(bin_path: str | None = None) -> bool:
     gate ``@pytest.mark.skipif(not co_available(), ...)``).
     """
     path = bin_path or resolve_bin_path()
-    if not path or not os.path.isfile(path) or not os.access(path, os.X_OK):
+    if not path or not os.path.isfile(path) or (
+        os.name != "nt" and not os.access(path, os.X_OK)
+    ):
         return False
     try:
         proc = subprocess.run(
@@ -307,7 +323,7 @@ def require_co(bin_path: str | None = None) -> str:
     path = bin_path or resolve_bin_path()
     if not path:
         raise CoNotAvailableError(_INSTALL_HINT)
-    if not (os.path.isfile(path) and os.access(path, os.X_OK)):
+    if not os.path.isfile(path) or (os.name != "nt" and not os.access(path, os.X_OK)):
         raise CoNotAvailableError(f"co binary not executable: {path}. {_INSTALL_HINT}")
     return path
 
@@ -368,7 +384,9 @@ class CoClient:
 
     def _binary(self) -> str:
         if self._bin_path:
-            if not (os.path.isfile(self._bin_path) and os.access(self._bin_path, os.X_OK)):
+            if not os.path.isfile(self._bin_path) or (
+                os.name != "nt" and not os.access(self._bin_path, os.X_OK)
+            ):
                 raise CoNotAvailableError(
                     f"co binary not executable: {self._bin_path}. {_INSTALL_HINT}"
                 )

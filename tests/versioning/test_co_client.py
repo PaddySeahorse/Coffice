@@ -71,6 +71,17 @@ def test_resolve_bin_path_prefers_cob(monkeypatch: pytest.MonkeyPatch) -> None:
     assert resolve_bin_path() == str(FAKE_CO)
 
 
+def test_resolve_bin_path_finds_windows_style_name(monkeypatch, tmp_path: Path) -> None:
+    candidate = tmp_path / "co.exe"
+    candidate.write_text("fake")
+    monkeypatch.delenv("CO_BIN", raising=False)
+    monkeypatch.delenv("COFFICE_CO_BIN", raising=False)
+    monkeypatch.setattr(
+        "shutil.which", lambda name: str(candidate) if name == "co.exe" else None
+    )
+    assert resolve_bin_path() == str(candidate)
+
+
 def test_require_co_missing_mentions_install(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("CO_BIN", raising=False)
     monkeypatch.delenv("COFFICE_CO_BIN", raising=False)
