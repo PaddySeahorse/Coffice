@@ -234,6 +234,10 @@ def find_baseline_commit(log: list[Any], prefix: str = "pre: ") -> str | None:
         if isinstance(pre_hash, str) and pre_hash:
             return pre_hash
     if len(log) >= 2:
+        # ``co log`` is newest-first. ``log[0]`` is HEAD -- typically the
+        # in-round write the agent just made, i.e. exactly what we are
+        # diffing *against* the baseline. ``log[1]`` is HEAD~ (its parent),
+        # which is the state before that write and therefore the baseline.
         head_hash = getattr(log[1], "hash", "")
         return str(head_hash) if head_hash else None
     if log:
