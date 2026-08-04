@@ -195,8 +195,10 @@ def _save(doc: Any) -> str | None:
 #: turn ``RecordChanges`` on, so there is no per-op LO redline index to report.
 #: The ``redline_id`` field stays in the response (``None``) for tool-output
 #: stability; downstream callers should fetch the virtual redline list via
-#: ``getRedlines`` (backed by ``diff_projector``) instead.
-_REDLINE_ID_NONE: int | None = None
+#: ``getRedlines`` (backed by ``diff_projector``) instead. The constant is
+#: typed ``None`` (not ``int | None``) because it never holds an int -- keeping
+#: the looser type would mislead callers about a value that no longer exists.
+_REDLINE_ID_NONE: None = None
 
 
 def _section_range(doc: Any, section_id: int) -> tuple[int, int]:
