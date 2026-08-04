@@ -192,6 +192,29 @@ def reject_hunk(
     return "".join(out)
 
 
+def _reject_from_hunks(
+    baseline_text: str,
+    hunks: list[Hunk],
+    rejected_ids: set[str],
+) -> str:
+    """Rebuild working text from already-computed ``hunks`` (no difflib rerun).
+
+    Walks the baseline text, filling equal gaps with the baseline content and
+    each hunk span with either the baseline (rejected) or current (kept) text.
+    Equivalent to :func:`reject_hunk` but reuses a prior :func:`diff_to_hunks`
+    pass so callers that already fetched the redlines list (e.g. to validate a
+    redline id) do not run the SequenceMatcher a second time.
+    """
+    out: list[str] = []
+    pos = 0
+    for hunk in sorted(hunks, key=lambda h: h.baseline_start):
+        out.append(baseline_text[pos:hunk.baseline_start])  # equal gap before hunk
+        out.append(hunk.baseline_text if hunk.id in rejected_ids else hunk.current_text)
+        pos = hunk.baseline_end
+    out.append(baseline_text[pos:])  # trailing equal segment
+    return "".join(out)
+
+
 def find_baseline_commit(log: list[Any], prefix: str = "pre: ") -> str | None:
     """Pick the most recent ``pre:`` commit from ``co log`` as the diff baseline.
 
@@ -237,6 +260,49 @@ class DiffProjector:
         self._loader = doc_loader
         self._temp_dir = temp_dir or tempfile.gettempdir()
         self._baseline_cache: dict[str, tuple[str, str]] = {}
+        # Hunks cache keyed by ``(doc_path, current_text, baseline_hash,
+        # author)``. A single-entry cache is enough because reject_redline
+        # always validates the id (computing redlines) immediately before
+        # rebuilding -- reusing the SequenceMatcher pass avoids the redundant
+        # diff the reviewer flagged.
+        self._hunks_cache: tuple[tuple[Any, ...], str, list[Hunk]] | None = None
+
+    def _compute_hunks(
+        self,
+        doc_path: str,
+        current_text: str,
+        baseline_hash: str | None,
+        author: str,
+    ) -> list[Hunk]:
+        """Resolve the baseline and diff it against ``current_text`` (cached).
+
+        Returns the hunks; the resolved baseline hash is held in
+        :attr:`_hunks_cache` so a follow-up :meth:`rebuild_after_reject` with
+        ``baseline_hash=None`` can fetch the baseline text without re-running
+        ``co log``.
+        """
+        key = (doc_path, current_text, baseline_hash, author)
+        if self._hunks_cache is not None and self._hunks_cache[0] == key:
+            return self._hunks_cache[2]
+        if baseline_hash is None:
+            log = self._co.log(doc_path)
+            baseline_hash = find_baseline_commit(log)
+        resolved_hash = baseline_hash or ""
+        if not resolved_hash:
+            return []
+        try:
+            baseline_text = self.baseline_text(doc_path, resolved_hash)
+        except Exception as exc:  # noqa: BLE001 - baseline unavailable is non-fatal
+            logger.warning(
+                "diff_projector: cannot load baseline %s for %s: %s",
+                resolved_hash,
+                doc_path,
+                exc,
+            )
+            return []
+        hunks = diff_to_hunks(baseline_text, current_text, author=author)
+        self._hunks_cache = (key, resolved_hash, hunks)
+        return hunks
 
     def baseline_text(self, doc_path: str, baseline_hash: str) -> str:
         """Return the working text of ``baseline_hash`` without touching ``doc_path``.
@@ -270,24 +336,11 @@ class DiffProjector:
         :func:`find_baseline_commit` from ``co log``. If no co history exists
         yet (fresh document, never snapshotted) the returned list is empty --
         there is nothing to diff against, and that is fine: the first round has
-        no reviewable redlines by construction.
+        no reviewable redlines by construction. The hunks pass is cached so a
+        follow-up ``rebuild_after_reject`` for the same text reuses it instead of
+        running the diff a second time.
         """
-        if baseline_hash is None:
-            log = self._co.log(doc_path)
-            baseline_hash = find_baseline_commit(log)
-        if not baseline_hash:
-            return []
-        try:
-            baseline_text = self.baseline_text(doc_path, baseline_hash)
-        except Exception as exc:  # noqa: BLE001 - baseline unavailable is non-fatal
-            logger.warning(
-                "diff_projector: cannot load baseline %s for %s: %s",
-                baseline_hash,
-                doc_path,
-                exc,
-            )
-            return []
-        hunks = diff_to_hunks(baseline_text, current_text, author=author)
+        hunks = self._compute_hunks(doc_path, current_text, baseline_hash, author)
         return [h.to_dict() for h in hunks]
 
     def rebuild_after_reject(
@@ -296,16 +349,27 @@ class DiffProjector:
         current_text: str,
         rejected_ids: set[str],
         baseline_hash: str | None = None,
+        author: str = "AI-Writer",
     ) -> str:
-        """Return the working text after ``rejected_ids`` hunks are rolled back."""
-        if baseline_hash is None:
-            log = self._co.log(doc_path)
-            baseline_hash = find_baseline_commit(log)
-        if not baseline_hash:
-            # No baseline -> nothing to reject against; keep current text.
-            return current_text
-        baseline_text = self.baseline_text(doc_path, baseline_hash)
-        return reject_hunk(baseline_text, current_text, rejected_ids)
+        """Return the working text after ``rejected_ids`` hunks are rolled back.
+
+        Prefers the cached hunks produced by a preceding :meth:`redlines` call
+        (same doc, text, baseline, author) so the reject path does not run the
+        SequenceMatcher twice; falls back to :func:`reject_hunk` on cache miss.
+        """
+        hunks = self._compute_hunks(doc_path, current_text, baseline_hash, author)
+        if not hunks:
+            if baseline_hash is None:
+                log = self._co.log(doc_path)
+                baseline_hash = find_baseline_commit(log)
+            if not baseline_hash:
+                return current_text
+            baseline_text = self.baseline_text(doc_path, baseline_hash)
+            return reject_hunk(baseline_text, current_text, rejected_ids)
+        # Cache holds the resolved baseline hash alongside the hunks.
+        resolved_hash = self._hunks_cache[1] if self._hunks_cache else ""
+        baseline_text = self.baseline_text(doc_path, resolved_hash) if resolved_hash else ""
+        return _reject_from_hunks(baseline_text, hunks, rejected_ids)
 
     # -- internals ------------------------------------------------------------
 
