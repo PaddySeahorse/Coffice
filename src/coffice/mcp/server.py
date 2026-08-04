@@ -67,6 +67,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
+from coffice.core.diff_projector import DiffProjector, make_doc_loader
 from coffice.governance import (
     AI_WRITER_ID,
     AuditLog,
@@ -270,14 +271,14 @@ def create_server(
     return mcp
 
 
-def _build_default_projector(co_client: CoClient) -> Any:
+def _build_default_projector(co_client: CoClient) -> DiffProjector:
     """Lazily construct the ADR-diff_projector instance for the server.
 
-    Kept as a factory rather than a module-level import so unit tests can
-    import :mod:`coffice.mcp.server` on systems without LibreOffice/PyUNO.
+    ``DiffProjector`` itself imports no PyUNO (only :mod:`difflib`, :mod:`os`,
+    etc.), so importing it at module load is safe on systems without
+    LibreOffice; the UNO-dependent document loader is still built lazily inside
+    the factory so importing :mod:`coffice.mcp.server` never starts LO.
     """
-    from coffice.core.diff_projector import DiffProjector, make_doc_loader
-
     def _open(path: str) -> Any:
         from coffice.core.document import Document
         from coffice.core.lo_manager import get_manager
