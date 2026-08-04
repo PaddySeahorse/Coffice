@@ -122,19 +122,67 @@ def audit_log(tmp_path: Path) -> AuditLog:
     return AuditLog(tmp_path / "audit.jsonl")
 
 
+class _AgentFakeProjector:
+    """Minimal stand-in for DiffProjector: returns one virtual redline so the
+    agent-loop acceptance test can assert "one redline group" without
+    LibreOffice or a real co checkout."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, Any]] = []
+
+    def redlines(
+        self,
+        path: str,
+        current_text: str,
+        baseline_hash: str | None = None,
+        author: str = "AI-Writer",
+    ) -> list[dict[str, Any]]:
+        self.calls.append(("redlines", (path, current_text)))
+        if not current_text:
+            return []
+        return [
+            {
+                "id": "h0_insert_agentdemo",
+                "type": "insert",
+                "author": author,
+                "baseline_range": {"start": 0, "end": 0},
+                "current_range": {"start": 0, "end": len(current_text)},
+                "baseline_text": "",
+                "current_text": current_text,
+            }
+        ]
+
+    def rebuild_after_reject(
+        self,
+        path: str,
+        current_text: str,
+        rejected_ids: set[str],
+        baseline_hash: str | None = None,
+    ) -> str:
+        self.calls.append(("rebuild_after_reject", (path, set(rejected_ids))))
+        return current_text
+
+
+@pytest.fixture()
+def fake_projector() -> _AgentFakeProjector:
+    return _AgentFakeProjector()
+
+
 @pytest.fixture()
 def agent_server(
     registry: DocumentRegistry,
     co_client: CoClient,
     round_tracker: RoundTracker,
     audit_log: AuditLog,
+    fake_projector: _AgentFakeProjector,
 ):
-    """FastMCP server wired with the fake doc/co and an audit log."""
+    """FastMCP server wired with the fake doc/co/projector and an audit log."""
     return create_server(
         registry=registry,
         co_client=co_client,
         round_tracker=round_tracker,
         audit_log=audit_log,
+        projector=fake_projector,
     )
 
 

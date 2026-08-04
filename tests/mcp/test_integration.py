@@ -123,7 +123,9 @@ def test_write_tools_edit_live_document(
     )
     assert inserted["ok"] is True
     assert inserted["saved"] is True
-    assert isinstance(inserted["redline_id"], int)
+    # ADR diff_projector: write tools never turn on RecordChanges, so there is
+    # no per-op LO redline index to report; the field stays None for back-compat.
+    assert inserted["redline_id"] is None
 
     styled = call_tool(
         server,

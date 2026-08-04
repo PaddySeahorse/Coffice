@@ -74,16 +74,6 @@ def _make_props(**kwargs: Any) -> tuple[Any, ...]:
     return tuple(values)
 
 
-def _iso_timestamp(dt: Any) -> str:
-    year = getattr(dt, "Year", 0) or 0
-    month = getattr(dt, "Month", 0) or 0
-    day = getattr(dt, "Day", 0) or 0
-    hour = getattr(dt, "Hours", 0) or 0
-    minute = getattr(dt, "Minutes", 0) or 0
-    second = getattr(dt, "Seconds", 0) or 0
-    return f"{year:04d}-{month:02d}-{day:02d}T{hour:02d}:{minute:02d}:{second:02d}"
-
-
 class Document:
     """Wrap a loaded ``com.sun.star.text.TextDocument`` with high-level ops.
 
@@ -357,7 +347,15 @@ class Document:
         columns.Count = int(count)
         return columns
 
-    # -- track changes (redlines) ----------------------------------------------
+    # -- track changes (display only) ------------------------------------------
+    #
+    # ADR (diff_projector): LibreOffice's native Track Changes is a *display*
+    # layer. The agent's write tools never turn ``RecordChanges`` on; every
+    # reviewable redline is computed by ``coffice.core.diff_projector`` from the
+    # ``co`` history. These accessors remain so humans can still toggle redline
+    # display themselves inside Writer, and the open/save lifecycle preserves
+    # whatever state the user chose. The agent-facing redline list/accept/reject
+    # lives at the MCP layer (``tools_read`` / ``tools_write``), not on Document.
 
     def _read_track_changes(self) -> bool:
         try:
@@ -379,7 +377,10 @@ class Document:
         return self._track_changes_enabled
 
     def enable_track_changes(self) -> None:
-        """Turn on LO track changes (redlines) for subsequent edits."""
+        """Turn on LO track changes (redlines) for human edits inside Writer.
+
+        The agent never calls this -- it is exposed for the human flow only.
+        """
         self._doc.setPropertyValue("RecordChanges", True)
         self._doc.setPropertyValue("RedlineProtection", False)
         self._track_changes_enabled = True
@@ -389,46 +390,15 @@ class Document:
         self._doc.setPropertyValue("RecordChanges", False)
         self._track_changes_enabled = False
 
-    def get_redlines(self) -> list[dict[str, Any]]:
-        """Return ``[{id, type, author, timestamp, text, comment}]`` redlines.
+    def replace_all_text(self, new_text: str) -> int:
+        """Replace the whole document body with ``new_text``; return new length.
 
-        ``id`` is the redline's position in the document's redline list and is
-        what :meth:`accept_redline` / :meth:`reject_redline` take.
+        Used by the diff_projector to materialise a reject decision: the MCP
+        layer computes the rebuilt text (baseline hunks restored where the
+        rejected redlines were, everything else kept) and asks the document to
+        swap the body in one shot. Keeping this op on :class:`Document` (rather
+        than open-coding it in the projector) keeps the UNO cursor logic in the
+        one place that owns it.
         """
-        redlines = self._doc.getRedlines()
-        result: list[dict[str, Any]] = []
-        for index in range(redlines.getCount()):
-            redline = redlines.getByIndex(index)
-            result.append(
-                {
-                    "id": index,
-                    "type": str(getattr(redline, "RedlineType", "") or ""),
-                    "author": str(getattr(redline, "Author", "") or ""),
-                    "timestamp": _iso_timestamp(getattr(redline, "TimeStamp", None)),
-                    "text": self._redline_text(redline),
-                    "comment": str(getattr(redline, "RedlineComment", "") or ""),
-                }
-            )
-        return result
-
-    @staticmethod
-    def _redline_text(redline: Any) -> str:
-        try:
-            return str(redline.getString())
-        except Exception:
-            return ""
-
-    def _redline_by_id(self, redline_id: int) -> Any:
-        try:
-            redlines = self._doc.getRedlines()
-            return redlines.getByIndex(int(redline_id))
-        except Exception as exc:
-            raise DocumentNotFoundError(f"redline {redline_id!r} not found") from exc
-
-    def accept_redline(self, redline_id: int) -> None:
-        """Accept (apply) the redline with the given ``id``."""
-        self._redline_by_id(redline_id).acceptChanges()
-
-    def reject_redline(self, redline_id: int) -> None:
-        """Reject (roll back) the redline with the given ``id``."""
-        self._redline_by_id(redline_id).rejectChanges()
+        self._doc.Text.setString(str(new_text))
+        return len(self.get_text())

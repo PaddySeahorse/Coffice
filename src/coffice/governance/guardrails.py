@@ -307,9 +307,10 @@ class WriteGuard:
                 "error": f"unknown agent {agent_id!r}; cannot authorize operation",
             }
 
-        if op in ("confirmOp", "rejectOp"):
-            # confirmation flow is not a document write; scope it to the agent
-            # but never rate-limit or region-check it.
+        if op in ("confirmOp", "rejectOp", "acceptRedline", "rejectRedline"):
+            # confirmation / redline-decision flow is not a free-form document
+            # write; scope it to the agent but never rate-limit or
+            # region-check it.
             if agent.scope.read_only:
                 return {
                     "status": "blocked",

@@ -8,7 +8,6 @@ import types
 from coffice.core.document import (
     Document,
     _filter_for,
-    _iso_timestamp,
     _make_props,
     _path_to_url,
 )
@@ -69,25 +68,6 @@ def test_path_to_url(tmp_path) -> None:
     url = _path_to_url(str(tmp_path / "doc.docx"))
     assert url.startswith("file://")
     assert url.endswith("doc.docx")
-
-
-def test_iso_timestamp_formats_struct_fields() -> None:
-    class FakeDateTime:
-        Year = 2026
-        Month = 7
-        Day = 31
-        Hours = 12
-        Minutes = 5
-        Seconds = 9
-
-    assert _iso_timestamp(FakeDateTime()) == "2026-07-31T12:05:09"
-
-
-def test_iso_timestamp_missing_fields() -> None:
-    class Empty:
-        pass
-
-    assert _iso_timestamp(Empty()) == "0000-00-00T00:00:00"
 
 
 def test_make_props_builds_property_values() -> None:

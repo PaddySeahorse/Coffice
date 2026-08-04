@@ -89,6 +89,11 @@ class WriteContext:
     author: str = "AI-Writer"
     human_operator: str | None = None
     audit: Callable[[dict[str, Any]], None] | None = None
+    #: Virtual-redline projector (ADR diff_projector). Wired by the MCP server
+    #: alongside the co client; ``None`` means versioning/projection is
+    #: unavailable -- redline tools degrade to "no redlines" / structured errors
+    #: rather than crashing.
+    projector: Any = None
 
     def snapshot(self, doc_id: str, message: str) -> str | None:
         """Commit the current on-disk doc; returns the hash (None if unsaved)."""
@@ -177,12 +182,6 @@ def pre_round_snapshot(
 # ============================================================================
 
 
-def _ensure_track_changes(doc: Any) -> None:
-    """Turn on LO track changes so the edit records a reviewable redline."""
-    if not getattr(doc, "track_changes_enabled", True):
-        doc.enable_track_changes()
-
-
 def _save(doc: Any) -> str | None:
     """Save the doc so co can see the edit; returns the path (None on failure)."""
     try:
@@ -192,15 +191,12 @@ def _save(doc: Any) -> str | None:
         return None
 
 
-def _newest_redline_id(doc: Any) -> int | None:
-    """Return the id of the most recently recorded redline (if any)."""
-    try:
-        redlines = doc.get_redlines()
-    except Exception:
-        return None
-    if not redlines:
-        return None
-    return int(redlines[-1]["id"])
+#: Track Changes is *display only* (ADR diff_projector): write tools never
+#: turn ``RecordChanges`` on, so there is no per-op LO redline index to report.
+#: The ``redline_id`` field stays in the response (``None``) for tool-output
+#: stability; downstream callers should fetch the virtual redline list via
+#: ``getRedlines`` (backed by ``diff_projector``) instead.
+_REDLINE_ID_NONE: int | None = None
 
 
 def _section_range(doc: Any, section_id: int) -> tuple[int, int]:
@@ -344,7 +340,6 @@ def insert_text(
 
     def execute() -> dict[str, Any]:
         doc = ctx.registry.get(doc_id)
-        _ensure_track_changes(doc)
         end = doc.insert_text(pos, text, style)
         saved = _save(doc)
         ctx.record_audit("op_executed", tool="insertText", doc_id=doc_id, ok=True)
@@ -353,7 +348,7 @@ def insert_text(
             "tool": "insertText",
             "docId": doc_id,
             "end": end,
-            "redline_id": _newest_redline_id(doc),
+            "redline_id": _REDLINE_ID_NONE,
             "saved": saved is not None,
         }
 
@@ -372,7 +367,6 @@ def replace_range(
 
     def execute() -> dict[str, Any]:
         doc = ctx.registry.get(doc_id)
-        _ensure_track_changes(doc)
         result = doc.replace_range(range, text)
         saved = _save(doc)
         ctx.record_audit("op_executed", tool="replaceRange", doc_id=doc_id, ok=True)
@@ -381,7 +375,7 @@ def replace_range(
             "tool": "replaceRange",
             "docId": doc_id,
             **result,
-            "redline_id": _newest_redline_id(doc),
+            "redline_id": _REDLINE_ID_NONE,
             "saved": saved is not None,
         }
 
@@ -400,7 +394,6 @@ def apply_style(
 
     def execute() -> dict[str, Any]:
         doc = ctx.registry.get(doc_id)
-        _ensure_track_changes(doc)
         doc.apply_style(range, style_id)
         saved = _save(doc)
         ctx.record_audit("op_executed", tool="applyStyle", doc_id=doc_id, ok=True)
@@ -409,7 +402,7 @@ def apply_style(
             "tool": "applyStyle",
             "docId": doc_id,
             "styleId": style_id,
-            "redline_id": _newest_redline_id(doc),
+            "redline_id": _REDLINE_ID_NONE,
             "saved": saved is not None,
         }
 
@@ -434,7 +427,6 @@ def generate_table(
 
     def execute() -> dict[str, Any]:
         doc = ctx.registry.get(doc_id)
-        _ensure_track_changes(doc)
         result = doc.generate_table(rows, cols, data)
         saved = _save(doc)
         ctx.record_audit("op_executed", tool="generateTable", doc_id=doc_id, ok=True)
@@ -443,7 +435,7 @@ def generate_table(
             "tool": "generateTable",
             "docId": doc_id,
             **result,
-            "redline_id": _newest_redline_id(doc),
+            "redline_id": _REDLINE_ID_NONE,
             "saved": saved is not None,
         }
 
@@ -471,7 +463,6 @@ def refactor_section(
 
     def execute() -> dict[str, Any]:
         doc = ctx.registry.get(doc_id)
-        _ensure_track_changes(doc)
         start, end = _section_range(doc, section_id)
         doc.replace_range({"start": start, "end": end}, instruction)
         saved = _save(doc)
@@ -482,7 +473,7 @@ def refactor_section(
             "docId": doc_id,
             "sectionId": section_id,
             "replaced_range": {"start": start, "end": end},
-            "redline_id": _newest_redline_id(doc),
+            "redline_id": _REDLINE_ID_NONE,
             "saved": saved is not None,
         }
 
@@ -511,7 +502,7 @@ def set_page_layout(
             "ok": True,
             "tool": "setPageLayout",
             "docId": doc_id,
-            "redline_id": _newest_redline_id(doc),
+            "redline_id": _REDLINE_ID_NONE,
             "saved": saved is not None,
         }
 
@@ -628,12 +619,210 @@ def reject_op(ctx: WriteContext, doc_id: str, token: str) -> dict[str, Any]:
     }
 
 
+# ============================================================================
+# Virtual redline decisions (ADR diff_projector)
+# ============================================================================
+#
+# Track Changes is *display only*: the agent's edits never produce LO redlines.
+# Redlines come from ``coffice.core.diff_projector`` -- a virtual list derived
+# from the round's baseline commit vs the current working text. Accepting a
+# hunk is a no-op on the working document (the change is already there); we
+# just record the decision in the audit log. Rejecting a hunk rolls that span
+# back to the baseline text, swaps the rebuilt content into the document, saves
+# it, and commits through ``co`` so the diff baseline advances.
+
+
+def _projector_or_error(ctx: WriteContext, doc_id: str) -> tuple[Any, dict[str, Any] | None]:
+    projector = ctx.projector
+    if projector is None:
+        return None, {
+            "ok": False,
+            "tool": "redline",
+            "docId": doc_id,
+            "status": "error",
+            "error": (
+                "diff_projector not configured; redline decisions need the "
+                "co-backed virtual-redline projector (set COFFICE_DOC_PATH "
+                "and ensure co is initialised)"
+            ),
+        }
+    return projector, None
+
+
+def accept_redline(
+    ctx: WriteContext, doc_id: str = DEFAULT_DOC_ID, redline_id: str = ""
+) -> dict[str, Any]:
+    """Accept a virtual redline by id (see :func:`diff_projector` redlines).
+
+    Accept is a no-op on the working document (the working text already
+    contains the change). The decision is recorded in the audit log so the
+    human/AI workflow can track which redlines have been resolved.
+    """
+    if not redline_id:
+        return {
+            "ok": False,
+            "tool": "acceptRedline",
+            "docId": doc_id,
+            "status": "error",
+            "error": "acceptRedline requires a non-empty redlineId",
+        }
+    projector, err = _projector_or_error(ctx, doc_id)
+    if err is not None:
+        return err
+    existing_ids = _redline_ids(projector, ctx, doc_id)
+    if redline_id not in existing_ids:
+        return {
+            "ok": False,
+            "tool": "acceptRedline",
+            "docId": doc_id,
+            "status": "error",
+            "error": f"redline {redline_id!r} not found",
+        }
+    ctx.record_audit(
+        "redline_decision",
+        action="accept",
+        tool="acceptRedline",
+        doc_id=doc_id,
+        redline_id=redline_id,
+    )
+    return {
+        "ok": True,
+        "tool": "acceptRedline",
+        "docId": doc_id,
+        "redline_id": redline_id,
+        "action": "accept",
+    }
+
+
+def reject_redline(
+    ctx: WriteContext, doc_id: str = DEFAULT_DOC_ID, redline_id: str = ""
+) -> dict[str, Any]:
+    """Reject a virtual redline by id: roll that hunk back to the baseline.
+
+    Rebuilds the working text with the rejected hunk restored to the baseline
+    span, swaps it into the document via ``replace_all_text``, saves, and
+    commits through ``co`` so the rollback is durable.
+    """
+    if not redline_id:
+        return {
+            "ok": False,
+            "tool": "rejectRedline",
+            "docId": doc_id,
+            "status": "error",
+            "error": "rejectRedline requires a non-empty redlineId",
+        }
+    projector, err = _projector_or_error(ctx, doc_id)
+    if err is not None:
+        return err
+    path = ctx.registry.path(doc_id)
+    if not path:
+        return {
+            "ok": False,
+            "tool": "rejectRedline",
+            "docId": doc_id,
+            "status": "error",
+            "error": (
+                "no on-disk document path; reject_redline needs a saved "
+                "document so the baseline can be read from co"
+            ),
+        }
+    existing_ids = _redline_ids(projector, ctx, doc_id)
+    if redline_id not in existing_ids:
+        return {
+            "ok": False,
+            "tool": "rejectRedline",
+            "docId": doc_id,
+            "status": "error",
+            "error": f"redline {redline_id!r} not found",
+        }
+    doc = ctx.registry.get(doc_id)
+    current_text = doc.get_text()
+    try:
+        new_text = projector.rebuild_after_reject(
+            path, current_text, {redline_id}
+        )
+    except Exception as exc:  # noqa: BLE001 - baseline unavailable / projector fault
+        logger.warning(
+            "reject_redline: rebuild failed for docId=%r redline=%s: %s",
+            doc_id,
+            redline_id,
+            exc,
+        )
+        return {
+            "ok": False,
+            "tool": "rejectRedline",
+            "docId": doc_id,
+            "status": "error",
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+    try:
+        doc.replace_all_text(new_text)
+    except Exception as exc:  # noqa: BLE001 - LO write failure
+        logger.warning(
+            "reject_redline: replace_all_text failed for docId=%r: %s", doc_id, exc
+        )
+        return {
+            "ok": False,
+            "tool": "rejectRedline",
+            "docId": doc_id,
+            "status": "error",
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+    saved = _save(doc)
+    commit_hash: str | None = None
+    if saved:
+        try:
+            commit_hash = ctx.co_client.commit(
+                path,
+                f"reject redline {redline_id}",
+                author=ctx.author,
+                human_operator=ctx.human_operator,
+            )
+        except CoError as exc:
+            logger.warning(
+                "reject_redline: co commit failed for docId=%r: %s", doc_id, exc
+            )
+    ctx.record_audit(
+        "redline_decision",
+        action="reject",
+        tool="rejectRedline",
+        doc_id=doc_id,
+        redline_id=redline_id,
+        commit_hash=commit_hash,
+        text_changed=current_text != new_text,
+    )
+    return {
+        "ok": True,
+        "tool": "rejectRedline",
+        "docId": doc_id,
+        "redline_id": redline_id,
+        "action": "reject",
+        "text_changed": current_text != new_text,
+        "commit_hash": commit_hash,
+        "saved": saved is not None,
+    }
+
+
+def _redline_ids(projector: Any, ctx: WriteContext, doc_id: str) -> set[str]:
+    """Return the set of currently-valid redline ids for ``doc_id``."""
+    doc = ctx.registry.get(doc_id)
+    path = ctx.registry.path(doc_id)
+    if not path:
+        return set()
+    try:
+        redlines = projector.redlines(path, doc.get_text())
+    except Exception:  # noqa: BLE001 - history/baseline unavailable is non-fatal
+        return set()
+    return {r["id"] for r in redlines}
+
+
 __all__ = [
     "DELETE_MEDIUM_THRESHOLD",
     "FORBIDDEN_OPS",
     "PendingOp",
     "RiskLevel",
     "WriteContext",
+    "accept_redline",
     "apply_style",
     "blocked_op_error",
     "classify",
@@ -644,6 +833,7 @@ __all__ = [
     "pre_round_snapshot",
     "refactor_section",
     "reject_op",
+    "reject_redline",
     "replace_range",
     "requires_confirmation",
     "set_page_layout",
