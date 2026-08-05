@@ -61,11 +61,29 @@ def get_tables(
 
 
 def get_redlines(
-    registry: DocumentRegistry, doc_id: str = DEFAULT_DOC_ID
+    registry: DocumentRegistry,
+    doc_id: str = DEFAULT_DOC_ID,
+    projector: Any | None = None,
 ) -> dict[str, Any]:
-    """Return the tracked-changes (redline) list of the document."""
+    """Return the virtual redline list of the document.
+
+    Redlines come from :class:`coffice.core.diff_projector.DiffProjector` --
+    they are *not* LO native Track Changes (ADR: Track Changes is display
+    only; the agent's write tools never turn on ``RecordChanges``). When no
+    projector is wired, or the document has no co history yet (fresh document,
+    first round), the list is empty rather than raising.
+    """
+    if projector is None:
+        return {"docId": doc_id, "redlines": []}
+    path = registry.path(doc_id)
+    if not path:
+        return {"docId": doc_id, "redlines": []}
     doc = registry.get(doc_id)
-    return {"docId": doc_id, "redlines": doc.get_redlines()}
+    try:
+        redlines = projector.redlines(path, doc.get_text())
+    except Exception as exc:  # noqa: BLE001 - baseline/history unavailable is non-fatal
+        return {"docId": doc_id, "redlines": [], "error": str(exc)}
+    return {"docId": doc_id, "redlines": redlines}
 
 
 def get_history(

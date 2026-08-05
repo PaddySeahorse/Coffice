@@ -53,6 +53,7 @@ class FakeDocument:
         styles: dict[str, list[str]] | None = None,
         tables: list[dict[str, Any]] | None = None,
         redlines: list[dict[str, Any]] | None = None,
+        text: str = "Report",
     ) -> None:
         self._outline = outline or [
             {"start": 0, "end": 11, "level": 1, "style": "Heading 1", "text": "Report"}
@@ -66,18 +67,30 @@ class FakeDocument:
         ]
         self._redlines = redlines or [
             {
-                "id": 0,
-                "type": "Insert",
+                "id": "h0_insert_aabbcc",
+                "type": "insert",
                 "author": "AI-Writer",
-                "timestamp": "2026-07-31T10:00:00",
-                "text": "new",
-                "comment": "",
+                "baseline_range": {"start": 0, "end": 0},
+                "current_range": {"start": 0, "end": 3},
+                "baseline_text": "",
+                "current_text": "new",
             }
         ]
+        self._text = text
         self.opened_at = DEFAULT_DOC_ID
 
     def get_outline(self) -> list[dict[str, Any]]:
         return self._outline
+
+    def get_text(self) -> str:
+        return self._text
+
+    def replace_all_text(self, new_text: str) -> int:
+        self._text = str(new_text)
+        return len(self._text)
+
+    def save(self, path: str | None = None) -> str:
+        return path or "/tmp/fake-report.docx"
 
     def get_selection(self, range: dict[str, int] | None = None) -> dict[str, Any]:
         if range is None:
@@ -188,6 +201,11 @@ def fake_document() -> FakeDocument:
 
 
 @pytest.fixture()
+def fake_projector() -> FakeProjector:
+    return FakeProjector()
+
+
+@pytest.fixture()
 def fake_registry(tmp_path: Path, fake_document: FakeDocument) -> DocumentRegistry:
     """Registry wired to return the shared FakeDocument from its factory."""
     return DocumentRegistry(
@@ -199,3 +217,61 @@ def fake_registry(tmp_path: Path, fake_document: FakeDocument) -> DocumentRegist
 @pytest.fixture()
 def fake_co_client() -> FakeCoClient:
     return FakeCoClient()
+
+
+class FakeProjector:
+    """In-memory stand-in for coffice.core.diff_projector.DiffProjector.
+
+    Tests inject this via ``create_server(projector=...)`` so the redline
+    tools stay deterministic without LibreOffice or a real ``co`` checkout.
+    """
+
+    def __init__(
+        self,
+        redlines: list[dict[str, Any]] | None = None,
+        rebuild_result: str | None = None,
+        raise_on_rebuild: bool = False,
+    ) -> None:
+        self._redlines = redlines if redlines is not None else [
+            {
+                "id": "h0_insert_aabbcc",
+                "type": "insert",
+                "author": "AI-Writer",
+                "baseline_range": {"start": 0, "end": 0},
+                "current_range": {"start": 0, "end": 3},
+                "baseline_text": "",
+                "current_text": "new",
+            }
+        ]
+        self._rebuild_result = rebuild_result
+        self._raise_on_rebuild = raise_on_rebuild
+        self.calls: list[tuple[str, Any]] = []
+
+    def redlines(
+        self,
+        path: str,
+        current_text: str,
+        baseline_hash: str | None = None,
+        author: str = "AI-Writer",
+    ) -> list[dict[str, Any]]:
+        self.calls.append(("redlines", (path, current_text)))
+        return [dict(r) for r in self._redlines]
+
+    def rebuild_after_reject(
+        self,
+        path: str,
+        current_text: str,
+        rejected_ids: set[str],
+        baseline_hash: str | None = None,
+    ) -> str:
+        self.calls.append(("rebuild_after_reject", (path, current_text, set(rejected_ids))))
+        if self._raise_on_rebuild:
+            raise RuntimeError("projector rebuild unavailable")
+        if self._rebuild_result is not None:
+            return self._rebuild_result
+        # Default: drop the rejected redline's current_text span from the text.
+        result = current_text
+        for r in self._redlines:
+            if r["id"] in rejected_ids and r["current_text"]:
+                result = result.replace(r["current_text"], "", 1)
+        return result

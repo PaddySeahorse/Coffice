@@ -87,38 +87,6 @@ def test_set_page_layout(desktop) -> None:
     assert doc.get_text() == ""
 
 
-def test_redlines(desktop) -> None:
-    doc = Document.create(desktop)
-    doc.insert_text(0, "Original")
-    assert not doc.track_changes_enabled
-
-    doc.enable_track_changes()
-    assert doc.track_changes_enabled
-    doc.insert_text("end", " Added")
-
-    redlines = doc.get_redlines()
-    assert redlines
-    inserts = [r for r in redlines if r["type"] == "Insert"]
-    assert inserts
-    assert "Added" in inserts[0]["text"]
-
-    doc.accept_redline(inserts[0]["id"])
-    assert doc.get_text() == "Original Added"
-    assert doc.get_redlines() == []
-
-
-def test_redline_reject(desktop) -> None:
-    doc = Document.create(desktop)
-    doc.insert_text(0, "Base")
-    doc.enable_track_changes()
-    doc.insert_text("end", "X")
-
-    redlines = doc.get_redlines()
-    insert = next(r for r in redlines if r["type"] == "Insert")
-    doc.reject_redline(insert["id"])
-    assert doc.get_text() == "Base"
-
-
 def test_save_reopen_docx(desktop, tmp_path) -> None:
     doc = Document.create(desktop)
     doc.insert_text(0, "Persisted content")
@@ -136,8 +104,6 @@ def test_save_reopen_docx(desktop, tmp_path) -> None:
     assert "Persisted content" in reopened.get_text()
     outline = reopened.get_outline()
     assert outline and outline[0]["text"].rstrip("\n") == "Heading"
-    redlines = reopened.get_redlines()
-    assert any("Tracked" in r["text"] for r in redlines)
     reopened.close()
 
 

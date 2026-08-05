@@ -284,7 +284,7 @@ def test_confirmation_thresholds() -> None:
 # --------------------------------------------------------------------------
 
 
-def test_insert_text_runs_immediately_with_track_changes(
+def test_insert_text_runs_immediately_without_track_changes(
     write_server: FastMCP, write_doc: FakeWriteDocument
 ) -> None:
     write_doc._text = "Hello world"  # noqa: SLF001
@@ -292,9 +292,12 @@ def test_insert_text_runs_immediately_with_track_changes(
     assert result["ok"] is True
     assert result["tool"] == "insertText"
     assert "redline_id" in result
+    assert result["redline_id"] is None  # Track Changes is display only
     assert result["saved"] is True
     assert write_doc._text == "Hello there world"  # noqa: SLF001
-    assert write_doc._track_enabled is True  # noqa: SLF001
+    # ADR diff_projector: write tools must NOT turn on RecordChanges -- redlines
+    # come from co history via diff_projector, not from LO Track Changes.
+    assert write_doc._track_enabled is False  # noqa: SLF001
 
 
 def test_small_replace_range_runs_immediately(

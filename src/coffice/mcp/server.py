@@ -67,6 +67,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
+from coffice.core.diff_projector import DiffProjector, make_doc_loader
 from coffice.governance import (
     AI_WRITER_ID,
     AuditLog,
@@ -126,6 +127,8 @@ WRITE_TOOL_NAMES = (
     "setPageLayout",
     "confirmOp",
     "rejectOp",
+    "acceptRedline",
+    "rejectRedline",
 )
 
 #: Governance tools (planning doc ch. 8), registered after the write tools.
@@ -203,6 +206,7 @@ def create_server(
     rate_limiter: RateLimiter | None = None,
     protected_regions: ProtectedRegionGuard | None = None,
     audit_log: AuditLog | None = None,
+    projector: Any | None = None,
 ) -> FastMCP:
     """Build the FastMCP server with the document registry and MCP tools.
 
@@ -227,6 +231,10 @@ def create_server(
         audit_log: governance doc 8.4 audit log; defaults to
             ``COFFICE_AUDIT_LOG``. When neither is set, auditing is disabled
             (the write-tools audit callback stays a no-op).
+        projector: virtual-redline projector backing ``getRedlines`` and
+            ``acceptRedline``/``rejectRedline`` (ADR diff_projector). When
+            ``None`` the server lazily builds one from ``lo_manager`` +
+            ``co_client``; pass a fake in tests.
 
     Returns a fully-registered FastMCP instance. Call ``server.run(
     transport="stdio")`` to serve, or use ``server.list_tools()`` /
@@ -255,8 +263,33 @@ def create_server(
     # FastMCP does not expose a version kwarg; the underlying MCPServer carries
     # it and reports it in the initialize handshake (serverInfo.version).
     mcp._mcp_server.version = version  # type: ignore[attr-defined]
-    _register_tools(mcp, registry, co_client, tracker, agents, limiter, regions, audit)
+    if projector is None:
+        projector = _build_default_projector(co_client)
+    _register_tools(
+        mcp, registry, co_client, tracker, agents, limiter, regions, audit, projector
+    )
     return mcp
+
+
+def _build_default_projector(co_client: CoClient) -> DiffProjector:
+    """Lazily construct the ADR-diff_projector instance for the server.
+
+    ``DiffProjector`` itself imports no PyUNO (only :mod:`difflib`, :mod:`os`,
+    etc.), so importing it at module load is safe on systems without
+    LibreOffice; the UNO-dependent document loader is still built lazily inside
+    the factory so importing :mod:`coffice.mcp.server` never starts LO.
+    """
+    def _open(path: str) -> Any:
+        from coffice.core.document import Document
+        from coffice.core.lo_manager import get_manager
+
+        manager = get_manager()
+        manager.ensure_running()
+        desktop = manager.get_desktop()
+        return Document.open(desktop, path)
+
+    doc_loader = make_doc_loader(_open)
+    return DiffProjector(co_client=co_client, doc_loader=doc_loader)
 
 
 def _register_tools(
@@ -268,6 +301,7 @@ def _register_tools(
     rate_limiter: RateLimiter,
     protected_regions: ProtectedRegionGuard,
     audit_log: AuditLog | None,
+    projector: Any,
 ) -> None:
     """Register the read, write, and confirmation tools on ``mcp``.
 
@@ -288,7 +322,9 @@ def _register_tools(
     the governance :class:`WriteGuard` (doc 8.2): forbidden ops, the rate
     limit, and protected-region overlaps are rejected before any UNO call.
     """
-    write_ctx = tools_write.WriteContext(registry=registry, co_client=co_client)
+    write_ctx = tools_write.WriteContext(
+        registry=registry, co_client=co_client, projector=projector
+    )
     if audit_log is not None:
         write_ctx.audit = round_audit_callback(audit_log, co_client, registry, write_ctx)
 
@@ -413,12 +449,17 @@ def _register_tools(
     @mcp.tool(
         name="getRedlines",
         description=(
-            "Return the tracked-changes (redline) list: id, type, author, "
-            "timestamp, text, comment."
+            "Return the virtual redline list (ADR diff_projector): id, type "
+            "(insert/delete/replace), author, baseline range, current range, "
+            "baseline text, current text. Redlines are derived from the diff "
+            "between the round's pre-snapshot baseline and the current working "
+            "text -- they are NOT LibreOffice Track Changes. ``id`` is a "
+            "content-stable sha256 fingerprint passed to acceptRedline/"
+            "rejectRedline."
         ),
     )
     def get_redlines(docId: str = DEFAULT_DOC_ID) -> dict[str, Any]:
-        return _guarded(tools_read.get_redlines, docId)
+        return _guarded(tools_read.get_redlines, docId, projector)
 
     @mcp.tool(
         name="getHistory",
@@ -654,6 +695,50 @@ def _register_tools(
     ) -> dict[str, Any]:
         return _governed_write(
             "rejectOp", {"token": token}, docId, tools_write.reject_op, token
+        )
+
+    @mcp.tool(
+        name="acceptRedline",
+        description=(
+            "Accept one virtual redline (id from getRedlines). Accept is a "
+            "no-op on the working document -- the change is already there -- "
+            "and the decision is recorded in the audit log. The diff_projector "
+            "redline id is content-stable so accepting one redline does not "
+            "shift the ids of other redlines."
+        ),
+    )
+    def accept_redline(
+        redlineId: str,
+        docId: str = DEFAULT_DOC_ID,
+    ) -> dict[str, Any]:
+        return _governed_write(
+            "acceptRedline",
+            {"redlineId": redlineId},
+            docId,
+            tools_write.accept_redline,
+            redlineId,
+        )
+
+    @mcp.tool(
+        name="rejectRedline",
+        description=(
+            "Reject one virtual redline (id from getRedlines): the hunk is "
+            "rolled back to the baseline span, the rebuilt text is written "
+            "into the document, the doc is saved, and a co commit records the "
+            "rollback. Use this to discard an agent edit the human does not "
+            "want to keep."
+        ),
+    )
+    def reject_redline(
+        redlineId: str,
+        docId: str = DEFAULT_DOC_ID,
+    ) -> dict[str, Any]:
+        return _governed_write(
+            "rejectRedline",
+            {"redlineId": redlineId},
+            docId,
+            tools_write.reject_redline,
+            redlineId,
         )
 
     # ------------------------------------------------------------------

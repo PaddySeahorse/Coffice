@@ -14,7 +14,7 @@ from typing import Any
 
 import pytest
 from mcp.server.fastmcp import FastMCP
-from tests.mcp.conftest import FakeCoClient, FakeDocument
+from tests.mcp.conftest import FakeCoClient, FakeDocument, FakeProjector
 
 from coffice.mcp import READ_TOOL_NAMES, create_server
 from coffice.mcp.registry import DEFAULT_DOC_ID, DocumentRegistry
@@ -42,8 +42,14 @@ def call_tool(server: FastMCP, name: str, arguments: dict[str, Any]) -> Any:
 
 
 @pytest.fixture()
-def server(fake_registry: DocumentRegistry, fake_co_client: FakeCoClient) -> FastMCP:
-    return create_server(registry=fake_registry, co_client=fake_co_client)
+def server(
+    fake_registry: DocumentRegistry,
+    fake_co_client: FakeCoClient,
+    fake_projector: FakeProjector,
+) -> FastMCP:
+    return create_server(
+        registry=fake_registry, co_client=fake_co_client, projector=fake_projector
+    )
 
 
 # --------------------------------------------------------------------------
@@ -135,8 +141,35 @@ def test_get_tables_shapes_result(server: FastMCP) -> None:
 def test_get_redlines_shapes_result(server: FastMCP) -> None:
     result = call_tool(server, "getRedlines", {"docId": DEFAULT_DOC_ID})
     redline = result["redlines"][0]
-    assert redline["type"] == "Insert"
+    assert redline["type"] == "insert"
     assert redline["author"] == "AI-Writer"
+    assert isinstance(redline["id"], str)
+    assert redline["id"]  # non-empty sha256 fingerprint
+    assert "baseline_range" in redline
+    assert "current_range" in redline
+
+
+def test_accept_redline_requires_redline_id(server: FastMCP) -> None:
+    with pytest.raises(Exception, match="redlineId|Field required|validation error"):
+        call_tool(server, "acceptRedline", {"docId": DEFAULT_DOC_ID})
+
+
+def test_accept_redline_records_decision(
+    server: FastMCP, fake_projector: FakeProjector
+) -> None:
+    redlines = call_tool(server, "getRedlines", {"docId": DEFAULT_DOC_ID})["redlines"]
+    rid = redlines[0]["id"]
+    result = call_tool(server, "acceptRedline", {"redlineId": rid})
+    assert result["ok"] is True
+    assert result["action"] == "accept"
+    assert result["redline_id"] == rid
+
+
+def test_reject_redline_rebuilds_text_and_commits(server: FastMCP) -> None:
+    result = call_tool(server, "rejectRedline", {"redlineId": "h0_insert_aabbcc"})
+    assert result["ok"] is True
+    assert result["action"] == "reject"
+    assert result["commit_hash"]  # co commit recorded the rollback
 
 
 # --------------------------------------------------------------------------

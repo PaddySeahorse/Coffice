@@ -80,7 +80,7 @@ def test_full_round_acceptance(
     # one redline group (the insert recorded a tracked change)
     redlines = call_tool(agent_server, "getRedlines", {})
     assert redlines["redlines"]
-    assert redlines["redlines"][0]["type"] == "Insert"
+    assert redlines["redlines"][0]["type"] == "insert"
 
     # exactly one audit record, carrying the round commit
     entries = audit_log.read()
