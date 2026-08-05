@@ -53,6 +53,18 @@ Python package layout under `src/coffice/`:
 
 ## Getting started
 
+### Linux (Debian/Ubuntu)
+
+```sh
+sudo apt install python3 python3-venv libreoffice python3-uno git cmake g++ zlib1g-dev libssl-dev
+```
+
+`python3-uno` makes `uno` importable from the system Python; alternatively use
+LibreOffice's bundled interpreter (see `docs/route1.md` §1.2). Debian's stock
+`nodejs` is usually below Node 20 — install Node.js 20+ via
+[NodeSource](https://github.com/nodesource/distributions) or nvm before
+`make setup`.
+
 ### macOS and Windows
 
 The Python runtime, LibreOffice bridge, UI, and `co` client support macOS and
@@ -99,10 +111,15 @@ The LLM endpoint is configured via `COFFICE_LLM_BASE_URL` /
 `COFFICE_LLM_MODEL` / `COFFICE_LLM_API_KEY` (Ollama, LM Studio, or any
 OpenAI-compatible cloud API — see `docs/route1.md` §1.4).
 
-The `co` CLI (version-control snapshots) is an external dependency installed by
-`make install-co` / `scripts/install_co.sh` (binary lands in `~/.local/bin/co`).
-The Python wrapper (`coffice.versioning`) reads `CO_BIN` and degrades gracefully
-with clear instructions when `co` is missing. LibreOffice is also external and
+The `co` CLI (version-control snapshots) is a separate project
+(<https://github.com/PaddySeahorse/co>, Git-style snapshots); its quickstart
+lives in that repo. `make install-co` (== `bash scripts/install_co.sh`) clones,
+builds with CMake, and installs the binary to `~/.local/bin/co` — this takes a
+few minutes and needs git, cmake >= 3.16, and a C++17 toolchain (the script
+prints the exact `apt` command if a piece is missing). The Python wrapper
+(`coffice.versioning`) reads `CO_BIN` (or probes `PATH` / `~/.local/bin`) and
+degrades gracefully with clear instructions when `co` is missing, so a failed
+build leaves the UI and agent fully usable. LibreOffice is also external and
 not vendored; see `docs/route1.md` for install instructions.
 
 ## Installing the LibreOffice extension (sidebar shell)
