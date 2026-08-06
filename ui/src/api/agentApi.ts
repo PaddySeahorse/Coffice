@@ -62,9 +62,16 @@ async function readSse(
         else if (line.startsWith("data:")) data += line.slice(5).trim();
       }
       if (data) {
+        let parsed: Record<string, unknown>;
+        try {
+          parsed = JSON.parse(data) as Record<string, unknown>;
+        } catch {
+          console.warn("[agentApi] skipping malformed SSE data frame");
+          continue;
+        }
         onEvent({
           event: name as ChatStreamEvent["event"],
-          data: JSON.parse(data) as Record<string, unknown>,
+          data: parsed,
         });
       }
     }
