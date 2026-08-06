@@ -16,7 +16,13 @@ from typing import Any
 
 import pytest
 
-from coffice.agent import AgentSession, ChatMessage, LLMClient, ToolCall
+from coffice.agent import (
+    AgentSession,
+    ChatMessage,
+    ChatStreamEvent,
+    LLMClient,
+    ToolCall,
+)
 from coffice.governance import AuditLog
 from coffice.mcp import create_server
 from coffice.mcp.middleware import RoundTracker
@@ -48,6 +54,21 @@ class ScriptedLLM:
         if not self._steps:
             return ChatMessage(content="(no more scripted steps)")
         return self._steps.pop(0)
+
+    def chat_stream(
+        self, messages: list[dict[str, Any]], tools: list[dict[str, Any]] | None = None
+    ):
+        """Stream one scripted step: content as a token, calls as tool_calls."""
+        self.calls.append((list(messages), list(tools) if tools else None))
+        if not self._steps:
+            msg = ChatMessage(content="(no more scripted steps)")
+        else:
+            msg = self._steps.pop(0)
+        if msg.content:
+            yield ChatStreamEvent(kind="content", text=msg.content)
+        for call in msg.tool_calls:
+            yield ChatStreamEvent(kind="tool_call", tool_call=call)
+        yield ChatStreamEvent(kind="done", message=msg)
 
     def tool_names_seen(self) -> list[str]:
         """The tool names offered to the model in the last call."""

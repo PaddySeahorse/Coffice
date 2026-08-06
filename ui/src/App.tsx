@@ -3,7 +3,11 @@
 // and hosts the Status bar strip, Export dialog, and Cmd+K palette.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { checkHealth, sendChat, sendConfirmation } from "./api/agentApi";
+import {
+  checkHealth,
+  sendChatStream,
+  sendConfirmationStream,
+} from "./api/agentApi";
 import {
   callTool,
   exportDoc,
@@ -41,6 +45,18 @@ let messageCounter = 0;
 function nextMessageId(): string {
   messageCounter += 1;
   return `msg-${Date.now().toString(36)}-${messageCounter}`;
+}
+
+/** Map the agent's confirmation dict (snake_case) to the UI's PendingConfirmation. */
+function toPendingConfirmation(raw: unknown): PendingConfirmation | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const data = raw as Record<string, unknown>;
+  return {
+    token: String(data.token ?? ""),
+    tool: String(data.tool ?? ""),
+    summary: String(data.summary ?? ""),
+    snapshotHash: data.snapshot_hash != null ? String(data.snapshot_hash) : null,
+  };
 }
 
 interface Banner {
@@ -109,15 +125,92 @@ export default function App() {
     ]);
   }, []);
 
+  /** Append a streamed token to the live assistant message (creates it first). */
+  const appendToken = useCallback((delta: string, streaming: { id: string | null }) => {
+    if (!streaming.id) {
+      streaming.id = nextMessageId();
+      setMessages((current) => [
+        ...current,
+        {
+          id: streaming.id!,
+          role: "assistant",
+          content: delta,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+      return;
+    }
+    setMessages((current) =>
+      current.map((message) =>
+        message.id === streaming.id ? { ...message, content: message.content + delta } : message,
+      ),
+    );
+  }, []);
+
+  /** Attach a pending confirmation to the live assistant message (or create one). */
+  const attachPending = useCallback(
+    (pending: PendingConfirmation | undefined, fallbackText: string, streaming: { id: string | null }) => {
+      if (streaming.id) {
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === streaming.id ? { ...message, pending } : message,
+          ),
+        );
+      } else {
+        appendMessage({
+          role: "assistant",
+          content: pending?.summary || fallbackText || "该改动需要确认",
+          pending,
+        });
+      }
+    },
+    [appendMessage],
+  );
+
+  const pruneEmptyStream = useCallback((streaming: { id: string | null }) => {
+    if (!streaming.id) return;
+    setMessages((current) =>
+      current.filter((message) => !(message.id === streaming.id && !message.content.trim() && !message.pending)),
+    );
+  }, []);
+
   const handleSend = useCallback(
     async (text: string) => {
       appendMessage({ role: "user", content: text });
       setBusyChat(true);
       setAgentStatus("working");
-      const result = await sendChat(text, sessionId ?? undefined, "sidebar-user");
+      const streaming = { id: null as string | null };
+      const result = await sendChatStream(
+        text,
+        sessionId ?? undefined,
+        "sidebar-user",
+        (event) => {
+          if (event.event === "token") {
+            appendToken(String(event.data.text ?? ""), streaming);
+          } else if (event.event === "tool") {
+            appendMessage({
+              role: "tool",
+              content: summarizeToolCall(event.data as unknown as AppliedToolCall),
+            });
+          } else if (event.event === "needs_confirmation") {
+            attachPending(
+              toPendingConfirmation(event.data.confirmation),
+              String(event.data.reply ?? ""),
+              streaming,
+            );
+          }
+        },
+      );
       setSessionId(result.session_id ?? sessionId);
-      setAgentStatus(result.status === "error" ? "error" : result.status === "needs_confirmation" ? "needs_confirmation" : "idle");
+      setAgentStatus(
+        result.status === "error"
+          ? "error"
+          : result.status === "needs_confirmation"
+            ? "needs_confirmation"
+            : "idle",
+      );
       setBusyChat(false);
+      pruneEmptyStream(streaming);
 
       if (result.status === "error") {
         appendMessage({
@@ -127,27 +220,19 @@ export default function App() {
         });
         return;
       }
-      for (const change of result.change_summary) {
-        appendMessage({
-          role: "tool",
-          content: summarizeToolCall(change),
-        });
-      }
-      if (result.status === "needs_confirmation") {
-        appendMessage({
-          role: "assistant",
-          content: result.confirmation?.summary || result.reply || "该改动需要确认",
-          pending: result.confirmation ?? undefined,
-        });
-      } else if (result.reply) {
-        appendMessage({ role: "assistant", content: result.reply });
-      }
       if (result.change_summary.length > 0) {
         setChangeSummary((current) => [...current, ...result.change_summary]);
         void refreshHistory();
       }
     },
-    [appendMessage, refreshHistory, sessionId],
+    [
+      appendMessage,
+      appendToken,
+      attachPending,
+      pruneEmptyStream,
+      refreshHistory,
+      sessionId,
+    ],
   );
 
   const handleConfirm = useCallback(
@@ -158,24 +243,54 @@ export default function App() {
       }
       setBusyChat(true);
       setAgentStatus("working");
-      const result = await sendConfirmation({ sessionId, token: pending.token, action });
-      setAgentStatus(result.status === "error" ? "error" : "idle");
+      const streaming = { id: null as string | null };
+      const result = await sendConfirmationStream(
+        { sessionId, token: pending.token, action },
+        (event) => {
+          if (event.event === "token") {
+            appendToken(String(event.data.text ?? ""), streaming);
+          } else if (event.event === "tool") {
+            appendMessage({
+              role: "tool",
+              content: summarizeToolCall(event.data as unknown as AppliedToolCall),
+            });
+          } else if (event.event === "needs_confirmation") {
+            attachPending(
+              toPendingConfirmation(event.data.confirmation),
+              String(event.data.reply ?? ""),
+              streaming,
+            );
+          }
+        },
+      );
+      setAgentStatus(
+        result.status === "error"
+          ? "error"
+          : result.status === "needs_confirmation"
+            ? "needs_confirmation"
+            : "idle",
+      );
       setBusyChat(false);
+      pruneEmptyStream(streaming);
       if (result.status === "error") {
         appendMessage({ role: "system", content: result.error ?? "操作失败", error: true });
         return;
       }
-      for (const change of result.change_summary) {
-        appendMessage({ role: "tool", content: summarizeToolCall(change) });
-      }
-      if (result.reply) appendMessage({ role: "assistant", content: result.reply });
       if (result.change_summary.length > 0) {
         setChangeSummary((current) => [...current, ...result.change_summary]);
         void refreshHistory();
       }
       void refreshHistory();
     },
-    [appendMessage, refreshHistory, sessionId, showBanner],
+    [
+      appendMessage,
+      appendToken,
+      attachPending,
+      pruneEmptyStream,
+      refreshHistory,
+      sessionId,
+      showBanner,
+    ],
   );
 
   const handleAcceptChange = useCallback(

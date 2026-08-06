@@ -1,6 +1,7 @@
 // Chat panel (planning doc 9.1): conversation with the AI over the agent HTTP
-// facade (POST /chat, /confirm). Non-streaming MVP: renders assistant replies
-// plus tool-call summaries, and a confirm/reject prompt for pending changes.
+// facade (POST /chat with stream:true -> SSE tokens, POST /confirm). Renders
+// assistant replies as they stream in, tool-call summaries, and a confirm/
+// reject prompt for pending changes.
 
 import { useState } from "react";
 import type { ChatMessageItem, PendingConfirmation } from "../types";

@@ -53,6 +53,7 @@ import logging
 import os
 import urllib.parse
 import uuid
+from collections.abc import Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
@@ -195,6 +196,74 @@ def handle_confirm(
 
 
 # ============================================================================
+# streaming handlers: SSE events for POST /chat and POST /confirm
+# (stream: true body flag). The agent's natural-language message streams as
+# ``token`` events while edits still apply atomically after each complete tool
+# call; ``tool`` events report each applied call.
+# ============================================================================
+
+
+def handle_chat_stream(
+    sessions: AgentSessions, body: dict[str, Any]
+) -> Iterator[dict[str, Any]]:
+    """Process a streamed ``POST /chat`` body; yields ``{"event", "data"}``.
+
+    Terminal events are ``done``, ``needs_confirmation``, and ``error``.
+    """
+    message = body.get("message")
+    if not isinstance(message, str) or not message.strip():
+        yield {
+            "event": "error",
+            "data": {"ok": False, "error": "'message' (non-empty string) is required"},
+        }
+        return
+    sid, session = sessions.get_or_create(
+        body.get("session_id"), human_operator=body.get("human_operator")
+    )
+    for event in session.chat_stream(message):
+        yield _sse_event(event, sid)
+
+
+def handle_confirm_stream(
+    sessions: AgentSessions, body: dict[str, Any]
+) -> Iterator[dict[str, Any]]:
+    """Process a streamed ``POST /confirm`` body; yields ``{"event", "data"}``."""
+    session_id = body.get("session_id")
+    if not isinstance(session_id, str):
+        yield {"event": "error", "data": {"ok": False, "error": "'session_id' is required"}}
+        return
+    token = body.get("token")
+    if not isinstance(token, str) or not token:
+        yield {"event": "error", "data": {"ok": False, "error": "'token' is required"}}
+        return
+    action = str(body.get("action") or "confirm")
+    session = sessions.get(session_id)
+    if session is None:
+        yield {"event": "error", "data": {"ok": False, "error": "unknown session_id"}}
+        return
+    if action == "reject":
+        events = session.reject_stream(token)
+    elif action == "confirm":
+        events = session.confirm_stream(token)
+    else:
+        yield {
+            "event": "error",
+            "data": {"ok": False, "error": f"unknown action {action!r} (confirm|reject)"},
+        }
+        return
+    for event in events:
+        yield _sse_event(event, session_id)
+
+
+def _sse_event(event: dict[str, Any], session_id: str) -> dict[str, Any]:
+    """Shape a session-loop event dict into an ``{"event", "data"}`` pair."""
+    data = dict(event)
+    event_type = data.pop("type", "message")
+    data.setdefault("session_id", session_id)
+    return {"event": event_type, "data": data}
+
+
+# ============================================================================
 # read introspection + generic tool passthrough (UI bead: Tools/Diff/History/
 # Export panels). Same tool names and result shapes as the MCP server.
 # ============================================================================
@@ -317,6 +386,22 @@ def build_handler(sessions: AgentSessions) -> type[BaseHTTPRequestHandler]:
             self.end_headers()
             self.wfile.write(data)
 
+        def _send_sse(self, events: Iterator[dict[str, Any]]) -> None:
+            """Write a streamed chat round as an SSE event stream."""
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            for event in events:
+                event_type = event.get("event", "message")
+                data = json.dumps(event.get("data", {}), ensure_ascii=False).encode(
+                    "utf-8"
+                )
+                self.wfile.write(f"event: {event_type}\n".encode())
+                self.wfile.write(b"data: " + data + b"\n\n")
+                self.wfile.flush()
+
         def _read_body(self) -> dict[str, Any]:
             try:
                 length = int(self.headers.get("Content-Length", "0"))
@@ -335,8 +420,14 @@ def build_handler(sessions: AgentSessions) -> type[BaseHTTPRequestHandler]:
             body = self._read_body()
             path = self.path.split("?", 1)[0].rstrip("/")
             if path == "/chat":
+                if body.get("stream") is True:
+                    self._send_sse(handle_chat_stream(sessions, body))
+                    return
                 status, payload = handle_chat(sessions, body)
             elif path == "/confirm":
+                if body.get("stream") is True:
+                    self._send_sse(handle_confirm_stream(sessions, body))
+                    return
                 status, payload = handle_confirm(sessions, body)
             elif path == "/tool":
                 status, payload = handle_tool_call(sessions, body)

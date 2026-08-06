@@ -1,5 +1,5 @@
 // Human-readable summaries for agent tool calls (chat panel + diff panel),
-// e.g. "insertText → 2 paragraphs" (planning doc 9.1 non-streaming MVP).
+// e.g. "insertText → 2 paragraphs".
 
 import type { AppliedToolCall } from "../types";
 

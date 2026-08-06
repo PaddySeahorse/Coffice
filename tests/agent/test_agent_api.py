@@ -21,6 +21,7 @@ from coffice.agent.agent_api import (
     AgentSessions,
     create_http_server,
     handle_chat,
+    handle_chat_stream,
     handle_confirm,
 )
 
@@ -166,3 +167,108 @@ def test_http_facade_bad_chat_body(http_server) -> None:
 def test_http_facade_unknown_route(http_server) -> None:
     status, _ = _post(f"{http_server}/nope", {})
     assert status == 404
+
+
+# --------------------------------------------------------------------------
+# streaming /chat (stream: true) over SSE
+# --------------------------------------------------------------------------
+
+
+def _sse_events_of(events: list[dict]) -> list[tuple[str, dict]]:
+    return [(ev["event"], ev["data"]) for ev in events]
+
+
+def test_handle_chat_stream_yields_token_tool_done(harness) -> None:
+    harness.llm.steps = [
+        tool_call("c1", "getOutline"),
+        ChatMessage(content="Streamed reply."),
+    ]
+    events = list(handle_chat_stream(harness.sessions, {"message": "hi", "session_id": "abc"}))
+    pairs = _sse_events_of(events)
+    assert [event for event, _ in pairs] == ["tool", "token", "done"]
+    done_data = dict(pairs[-1][1])
+    assert done_data["status"] == "complete"
+    assert done_data["reply"] == "Streamed reply."
+    assert done_data["session_id"] == "abc"
+    token_data = dict(pairs[-2][1])
+    assert token_data["text"] == "Streamed reply."
+
+
+def test_handle_chat_stream_requires_message(harness) -> None:
+    events = list(handle_chat_stream(harness.sessions, {}))
+    assert events[0]["event"] == "error"
+    assert "required" in events[0]["data"]["error"]
+
+
+def test_handle_chat_stream_confirmation_events(harness) -> None:
+    harness.doc._text = "A" * 100  # noqa: SLF001
+    harness.llm.steps = [
+        tool_call("c1", "replaceRange", range={"start": 0, "end": 60}, text="B"),
+        ChatMessage(content="done"),
+    ]
+    events = list(
+        handle_chat_stream(harness.sessions, {"message": "edit", "session_id": "abc"})
+    )
+    last = events[-1]
+    assert last["event"] == "needs_confirmation"
+    assert last["data"]["confirmation"]["token"]
+    assert last["data"]["session_id"] == "abc"
+
+
+def _post_sse(url: str, body: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
+    """POST and parse an SSE response into ``(event, data)`` pairs."""
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(body).encode("utf-8"),
+        headers={"Content-Type": "application/json", "Accept": "text/event-stream"},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=10) as response:
+        assert response.headers.get("Content-Type", "").startswith("text/event-stream")
+        raw = response.read().decode("utf-8")
+    pairs: list[tuple[str, dict[str, Any]]] = []
+    for frame in raw.split("\n\n"):
+        event = "message"
+        data_lines: list[str] = []
+        for line in frame.splitlines():
+            if line.startswith("event:"):
+                event = line[len("event:") :].strip()
+            elif line.startswith("data:"):
+                data_lines.append(line[len("data:") :].strip())
+        if data_lines:
+            pairs.append((event, json.loads("".join(data_lines))))
+    return pairs
+
+
+def test_http_facade_chat_streams_sse(http_server, harness) -> None:
+    harness.doc._text = "A" * 100  # noqa: SLF001
+    harness.llm.steps = [
+        tool_call("c1", "replaceRange", range={"start": 0, "end": 60}, text="B"),
+        ChatMessage(content="Streamed."),
+    ]
+    pairs = _post_sse(
+        f"{http_server}/chat",
+        {"message": "replace the intro", "stream": True},
+    )
+    events = [event for event, _ in pairs]
+    assert events == ["needs_confirmation"]
+    token = pairs[0][1]["confirmation"]["token"]
+    session_id = pairs[0][1]["session_id"]
+
+    # resume over the streaming /confirm endpoint
+    pairs = _post_sse(
+        f"{http_server}/confirm",
+        {"session_id": session_id, "token": token, "action": "confirm", "stream": True},
+    )
+    events = [event for event, _ in pairs]
+    assert events == ["tool", "token", "done"]
+    done = pairs[-1][1]
+    assert done["status"] == "complete"
+    assert done["reply"] == "Streamed."
+    assert harness.doc._text == "B" + "A" * 40  # noqa: SLF001
+
+
+def test_http_facade_chat_stream_bad_body(http_server) -> None:
+    pairs = _post_sse(f"{http_server}/chat", {"stream": True})
+    assert pairs[0][0] == "error"
+    assert "required" in pairs[0][1]["error"]

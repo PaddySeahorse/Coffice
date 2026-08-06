@@ -68,8 +68,9 @@ instructions when it is absent.
 
 ### 1.4 An LLM endpoint (OpenAI-compatible)
 
-The agent talks to **any** OpenAI-compatible chat-completions endpoint
-(non-streaming only). Configure it with environment variables:
+The agent talks to **any** OpenAI-compatible chat-completions endpoint (text
+replies stream over SSE; tool calls complete before any edit is applied).
+Configure it with environment variables:
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -216,9 +217,11 @@ ADR-005 export flow (PURE copy + `.co-bundle` companion).
 
 Phase 1 deliberately **excludes**:
 
-- **Streaming / Ghost Text** — the LLM client pins `stream: false`; the
-  document is edited via explicit tool calls, never streamed token-by-token.
-  (`llm_client.py` — "non-streaming is a Phase 1 requirement").
+- **Streaming / Ghost Text** — the agent's chat reply streams to the sidebar
+  over SSE (`chat_stream` / `POST /chat` with `stream: true`), but the
+  document itself is still edited via explicit tool calls, applied atomically
+  per complete call; Ghost Text (streaming token-by-token into the document)
+  remains excluded.
 - **Vision / `renderTile`** — the `renderTile` MCP tool is registered but
   returns a structured error ("requires Phase 2 (LOKit tiled rendering)"). No
   image understanding of the page.
