@@ -25,6 +25,11 @@ drives the tool-calling loop that turns a user prompt into document edits:
 Tool-call history is kept in OpenAI message format, so any compatible endpoint
 (Ollama, LM Studio, OpenAI, Anthropic-compatible proxies) can resume the
 conversation across confirmations.
+
+Streaming chat (:meth:`AgentSession.chat_stream` /
+:meth:`AgentSession.confirm_stream`) mirrors the loop above but yields the
+model's text as ``token`` events as they arrive; tool calls are still applied
+only once the full call has streamed in, keeping every document edit atomic.
 """
 
 from __future__ import annotations
@@ -33,6 +38,7 @@ import asyncio
 import json
 import logging
 import uuid
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -51,13 +57,25 @@ DEFAULT_MAX_TOOL_CALLS = 24
 
 
 class ChatCompleter(Protocol):
-    """Anything with an OpenAI-style ``chat`` (LLMClient, scripted fakes)."""
+    """Anything with an OpenAI-style ``chat`` (LLMClient, scripted fakes).
+
+    ``chat_stream`` is optional (protocol + fallback): when present it must
+    yield :class:`ChatStreamEvent` objects ending in a ``done`` event whose
+    ``message`` is the complete assistant turn. When absent the loop falls
+    back to ``chat`` and emits the whole reply as a single token event.
+    """
 
     def chat(
         self,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
     ) -> ChatMessage: ...
+
+    def chat_stream(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
+    ) -> Any: ...
 
 
 class ToolExecutor(Protocol):
@@ -96,7 +114,8 @@ def build_system_prompt(
         "1. Read before you write: call getOutline/getSelection to understand "
         "the document before making any edit.",
         "2. Make one logical change per tool call; keep edits to whole "
-        "paragraphs (this session is non-streaming).",
+        "paragraphs (chat replies stream to the human, but each document edit "
+        "applies atomically per tool call).",
         "3. Never attempt destructive or forbidden operations (they are "
         "blocked by governance before any edit): no clearDocument, no "
         "encryption/signing/macro, no operations outside this tool list.",
@@ -316,6 +335,70 @@ class AgentSession:
         )
         return self._run_loop()
 
+    def chat_stream(self, user_message: str) -> Iterator[dict[str, Any]]:
+        """Stream one chat round as UI events (``type``/payload dicts).
+
+        Yields ``token`` (a text delta), ``tool`` (one applied tool call, as
+        an ``AppliedToolCall``-shaped dict), ``needs_confirmation`` (paused;
+        resume via :meth:`confirm_stream`/:meth:`reject_stream`), ``done``
+        (final ``ChatResult`` payload) or ``error``. Tool calls are applied
+        only after the model finishes emitting the full call, so the document
+        edit path stays atomic (whole-paragraph, one change per call).
+        """
+        if self._pending is not None:
+            yield self._error_event(
+                "a change is awaiting confirmation; call confirm() or reject() "
+                "before sending a new message"
+            )
+            return
+        if not user_message or not str(user_message).strip():
+            yield self._error_event("empty user message")
+            return
+        self._round = self._tracker.start_round(
+            self.agent_id, self.human_operator
+        )
+        self._messages.append({"role": "user", "content": str(user_message)})
+        logger.info(
+            "session %s: round %s started (streaming, agent=%s operator=%s)",
+            self.session_id,
+            self._round.round_id,
+            self.agent_id,
+            self.human_operator,
+        )
+        yield from self._stream_loop()
+
+    def confirm_stream(self, token: str) -> Iterator[dict[str, Any]]:
+        """Stream the confirm-and-resume path (mirrors :meth:`confirm`)."""
+        if self._pending is None or self._pending.token != token:
+            yield self._error_event(f"no pending confirmation for token {token!r}")
+            return
+        logger.info(
+            "session %s: confirming %s (token=%s)",
+            self.session_id,
+            self._pending.tool,
+            token,
+        )
+        result = self._executor.call(
+            "confirmOp", {"token": token, "docId": self._pending.doc_id}
+        )
+        yield from self._resolve_confirmation_stream(result)
+
+    def reject_stream(self, token: str) -> Iterator[dict[str, Any]]:
+        """Stream the reject-and-rollback path (mirrors :meth:`reject`)."""
+        if self._pending is None or self._pending.token != token:
+            yield self._error_event(f"no pending confirmation for token {token!r}")
+            return
+        logger.info(
+            "session %s: rejecting %s (token=%s)",
+            self.session_id,
+            self._pending.tool,
+            token,
+        )
+        result = self._executor.call(
+            "rejectOp", {"token": token, "docId": self._pending.doc_id}
+        )
+        yield from self._resolve_confirmation_stream(result)
+
     def confirm(self, token: str) -> ChatResult:
         """Confirm a pending operation, then resume the tool loop."""
         if self._pending is None or self._pending.token != token:
@@ -362,6 +445,158 @@ class AgentSession:
         }
 
     # -- internals ----------------------------------------------------------
+
+    def _error_event(self, message: str) -> dict[str, Any]:
+        return {"type": "error", "error": message}
+
+    def _stream_llm_call(self, tools: list[dict[str, Any]] | None) -> Iterator[dict[str, Any]]:
+        """Stream one LLM call, yielding ``token`` events.
+
+        The complete assistant turn arrives as the last emitted event
+        (``llm_done`` with ``data["message"]``); a failed call yields
+        ``llm_error`` instead. Callers consume this before continuing.
+        """
+        content_parts: list[str] = []
+        tool_acc: dict[str, ToolCall] = {}
+        streamer = getattr(self._llm, "chat_stream", None)
+        if streamer is None:
+            try:
+                message = self._llm.chat(self._messages, tools=tools)
+            except LLMError as exc:
+                logger.warning(
+                    "session %s: LLM call failed: %s", self.session_id, exc
+                )
+                yield {"type": "llm_error", "error": f"LLM call failed: {exc}"}
+                return
+            if message.content:
+                yield {"type": "token", "text": message.content}
+            yield {"type": "llm_done", "message": message}
+            return
+        complete: ChatMessage | None = None
+        try:
+            for event in streamer(self._messages, tools=tools):
+                if event.kind == "content" and event.text:
+                    content_parts.append(event.text)
+                    yield {"type": "token", "text": event.text}
+                elif event.kind == "tool_call" and event.tool_call is not None:
+                    tool_acc[event.tool_call.id] = event.tool_call
+                elif event.kind == "done" and event.message is not None:
+                    complete = event.message
+        except LLMError as exc:
+            logger.warning(
+                "session %s: LLM call failed: %s", self.session_id, exc
+            )
+            yield {"type": "llm_error", "error": f"LLM call failed: {exc}"}
+            return
+        if complete is None:
+            complete = ChatMessage(
+                content="".join(content_parts) or None,
+                tool_calls=list(tool_acc.values()),
+            )
+        yield {"type": "llm_done", "message": complete}
+
+    def _stream_loop(self) -> Iterator[dict[str, Any]]:
+        """The streaming tool-calling loop (mirrors :meth:`_run_loop`)."""
+        for _ in range(self.max_tool_calls):
+            message: ChatMessage | None = None
+            llm_error: str | None = None
+            for event in self._stream_llm_call(self._tools or None):
+                if event["type"] == "token":
+                    yield event
+                elif event["type"] == "llm_error":
+                    llm_error = event["error"]
+                elif event["type"] == "llm_done":
+                    message = event["message"]
+            if llm_error is not None:
+                yield self._error_event(llm_error)
+                return
+            if message is None:
+                yield self._error_event("LLM returned no message")
+                return
+            if not message.has_tool_calls:
+                reply = message.content or ""
+                self._messages.append({"role": "assistant", "content": reply})
+                yield {
+                    "type": "done",
+                    "status": "complete",
+                    "reply": reply,
+                    "change_summary": list(self._change_summary),
+                    "round_id": self._round.round_id if self._round else None,
+                }
+                return
+            self._append_assistant_turn(message)
+            for tool_call in message.tool_calls:
+                outcome = self._apply_tool_call(tool_call)
+                if outcome.get("status") == "needs_confirmation":
+                    yield {
+                        "type": "needs_confirmation",
+                        "confirmation": outcome,
+                        "reply": "",
+                        "change_summary": list(self._change_summary),
+                        "round_id": self._round.round_id if self._round else None,
+                    }
+                    return
+                yield {
+                    "type": "tool",
+                    "tool": tool_call.name,
+                    "arguments": tool_call.arguments,
+                    "result": outcome,
+                    "ok": bool(outcome.get("ok", True)),
+                }
+        logger.warning(
+            "session %s: tool loop hit max_tool_calls=%d",
+            self.session_id,
+            self.max_tool_calls,
+        )
+        yield self._error_event(
+            f"tool loop exceeded max_tool_calls ({self.max_tool_calls}); "
+            "the agent's work was cut off"
+        )
+
+    def _resolve_confirmation_stream(
+        self, result: dict[str, Any]
+    ) -> Iterator[dict[str, Any]]:
+        """Stream the post-confirmation path (mirrors :meth:`_resolve_confirmation`)."""
+        pending = self._pending
+        if pending is None:
+            yield self._error_event("no pending confirmation")
+            return
+        self._pending = None
+        self._messages[pending.message_index]["content"] = _json_content(result)
+        if result.get("status") == "needs_confirmation":
+            self._pending = PendingConfirmation(
+                token=str(result.get("token") or pending.token),
+                tool=pending.tool,
+                doc_id=str(result.get("docId") or pending.doc_id),
+                snapshot_hash=result.get("snapshot_hash") or pending.snapshot_hash,
+                summary=str(result.get("summary") or pending.summary),
+                tool_call_id=pending.tool_call_id,
+                message_index=pending.message_index,
+            )
+            yield {
+                "type": "needs_confirmation",
+                "confirmation": result,
+                "reply": "",
+                "change_summary": list(self._change_summary),
+                "round_id": self._round.round_id if self._round else None,
+            }
+            return
+        self._change_summary.append(
+            AppliedToolCall(
+                tool=pending.tool,
+                arguments={},
+                result=result,
+                ok=bool(result.get("ok", True)),
+            ).to_dict()
+        )
+        yield {
+            "type": "tool",
+            "tool": pending.tool,
+            "arguments": {},
+            "result": result,
+            "ok": bool(result.get("ok", True)),
+        }
+        yield from self._stream_loop()
 
     def _run_loop(self) -> ChatResult:
         for _ in range(self.max_tool_calls):

@@ -20,10 +20,10 @@ agent API / MCP server are up: every API call falls back to bundled mock data.
 
 ## Panels (planning doc 9.1 / 9.2)
 
-- **Chat** — conversation with the AI over the agent HTTP facade (`POST /chat`,
-  `POST /confirm`). Non-streaming MVP: assistant replies plus tool-call
-  summaries ("insertText → 2 paragraphs"), and a confirm/reject prompt when a
-  write tool needs approval.
+- **Chat** — conversation with the AI over the agent HTTP facade (`POST /chat`
+  with `stream: true` → SSE tokens, `POST /confirm`). Assistant replies render
+  as they stream in, plus tool-call summaries ("insertText → 2 paragraphs"),
+  and a confirm/reject prompt when a write tool needs approval.
 - **Context** — current document id / path / selection and the outline
   (getOutline/getSelection), with a manual refresh.
 - **Tools** — registered MCP tools with descriptions, fetched from the

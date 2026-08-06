@@ -15,9 +15,10 @@ snapshots.
 ## Route 1 (MVP, Phase 1) scope
 
 Route 1 = LibreOffice native app + a sidebar ("Agent Deck") hosting a React UI,
-with a PyUNO bridge, an MCP server, and `co` CLI subprocess integration. Phase 1
-deliberately excludes streaming/Ghost Text and multimodal vision
-(`renderTile`), and is a single-user, single-agent setup.
+with a PyUNO bridge, an MCP server, and `co` CLI subprocess integration. The
+agent's chat reply streams to the sidebar over SSE; document edits still apply
+atomically per tool call (no Ghost Text, no multimodal vision / `renderTile`),
+and the setup is single-user, single-agent.
 
 ## Architecture
 

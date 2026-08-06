@@ -42,6 +42,44 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("./api/agentApi", () => ({
   checkHealth: vi.fn(async () => false),
+  sendChatStream: vi.fn(
+    async (
+      _message: string,
+      _sessionId: string | undefined,
+      _operator: string | undefined,
+      onEvent?: (event: { event: string; data: Record<string, unknown> }) => void,
+    ) => {
+      onEvent?.({ event: "token", data: { text: "已完成。" } });
+      return {
+        status: "complete",
+        reply: "已完成。",
+        change_summary: [],
+        round_id: "r1",
+        needs_confirmation: false,
+        confirmation: null,
+        error: null,
+        session_id: "s1",
+      };
+    },
+  ),
+  sendConfirmationStream: vi.fn(
+    async (
+      _request: unknown,
+      onEvent?: (event: { event: string; data: Record<string, unknown> }) => void,
+    ) => {
+      onEvent?.({ event: "token", data: { text: "已确认。" } });
+      return {
+        status: "complete",
+        reply: "已确认。",
+        change_summary: [],
+        round_id: "r1",
+        needs_confirmation: false,
+        confirmation: null,
+        error: null,
+        session_id: "s1",
+      };
+    },
+  ),
   sendChat: vi.fn(async () => ({
     status: "complete",
     reply: "已完成。",
@@ -151,5 +189,23 @@ describe("Agent Deck", () => {
     expect(screen.getByText("回滚到上一步")).toBeInTheDocument();
     expect(screen.getByText("查看历史")).toBeInTheDocument();
     expect(screen.getByText("创建分支")).toBeInTheDocument();
+  });
+
+  it("streams assistant tokens into the chat while running", async () => {
+    const { sendChatStream } = await import("./api/agentApi");
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(screen.getByLabelText("消息输入"), "写一段总结");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+
+    // the streamed token lands in the assistant message
+    expect(await screen.findByText("已完成。")).toBeInTheDocument();
+    expect(sendChatStream).toHaveBeenCalledWith(
+      "写一段总结",
+      undefined,
+      "sidebar-user",
+      expect.any(Function),
+    );
   });
 });

@@ -14,10 +14,11 @@ change summary. Public API::
     from coffice.agent import build_sessions
     httpd = create_http_server(build_sessions())  # POST /chat, /confirm
 
-The non-streaming MVP (doc 10.2: no streaming/Ghost Text; whole-paragraph
-inserts only) and the doc 4.1 per-round snapshot boundary are both enforced
-here: one ``co commit -m "pre: <round_id>"`` per round, medium/high-risk ops
-paused for human confirmation with snapshot-hash rollback.
+The doc 4.1 per-round snapshot boundary is enforced here: one
+``co commit -m "pre: <round_id>"`` per round, medium/high-risk ops
+paused for human confirmation with snapshot-hash rollback. The agent's chat
+reply streams to the Agent Deck over SSE (``chat_stream``); document edits
+still apply atomically per complete tool call.
 """
 
 from coffice.agent.agent_api import (
@@ -43,6 +44,7 @@ from coffice.agent.llm_client import (
     DEFAULT_BASE_URL,
     DEFAULT_MODEL,
     ChatMessage,
+    ChatStreamEvent,
     LLMClient,
     LLMConfigError,
     LLMError,
@@ -50,6 +52,7 @@ from coffice.agent.llm_client import (
     ToolCall,
     function_tool,
     parse_chat_response,
+    parse_sse_events,
 )
 
 __all__ = [
@@ -58,6 +61,7 @@ __all__ = [
     "AppliedToolCall",
     "ChatMessage",
     "ChatResult",
+    "ChatStreamEvent",
     "DEFAULT_BASE_URL",
     "DEFAULT_MAX_TOOL_CALLS",
     "DEFAULT_MODEL",
@@ -78,4 +82,5 @@ __all__ = [
     "handle_chat",
     "handle_confirm",
     "parse_chat_response",
+    "parse_sse_events",
 ]

@@ -42,6 +42,12 @@ export interface ChatResult {
   session_id?: string;
 }
 
+/** One SSE event from the streaming /chat endpoint (agent_api SSE channel). */
+export interface ChatStreamEvent {
+  event: "token" | "tool" | "needs_confirmation" | "done" | "error";
+  data: Record<string, unknown>;
+}
+
 /** Tool descriptor from GET /tools (MCP tool introspection). */
 export interface McpToolInfo {
   name: string;
