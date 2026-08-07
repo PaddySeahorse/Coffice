@@ -175,6 +175,17 @@ export default function App() {
     );
   }, []);
 
+  /** Clear the confirmation prompt on the message carrying the given token. */
+  const clearPending = useCallback((token: string) => {
+    setMessages((current) =>
+      current.map((message) =>
+        message.pending && message.pending.token === token
+          ? { ...message, pending: undefined }
+          : message,
+      ),
+    );
+  }, []);
+
   const handleSend = useCallback(
     async (text: string) => {
       appendMessage({ role: "user", content: text });
@@ -237,10 +248,10 @@ export default function App() {
   );
 
   const handleConfirm = useCallback(
-    async (pending: PendingConfirmation, action: "confirm" | "reject") => {
+    async (pending: PendingConfirmation, action: "confirm" | "reject"): Promise<boolean> => {
       if (!sessionId) {
         showBanner("error", "没有可用的会话 ID");
-        return;
+        return false;
       }
       setBusyChat(true);
       setAgentStatus("working");
@@ -275,18 +286,23 @@ export default function App() {
       pruneEmptyStream(streaming);
       if (result.status === "error") {
         appendMessage({ role: "system", content: result.error ?? "操作失败", error: true });
-        return;
+        return false;
       }
+      // The pending change was resolved: hide its confirm prompt so the same
+      // token cannot be confirmed again (the backend clears it after one use).
+      clearPending(pending.token);
       if (result.change_summary.length > 0) {
         setChangeSummary((current) => [...current, ...result.change_summary]);
         void refreshHistory();
       }
       void refreshHistory();
+      return true;
     },
     [
       appendMessage,
       appendToken,
       attachPending,
+      clearPending,
       pruneEmptyStream,
       refreshHistory,
       sessionId,
@@ -295,27 +311,26 @@ export default function App() {
   );
 
   const handleAcceptChange = useCallback(
-    (change: AppliedToolCall) => {
+    async (change: AppliedToolCall) => {
       const pending = messages.find((message) => message.pending)?.pending;
       if (pending) {
-        void handleConfirm(pending, "confirm");
-        return;
+        const accepted = await handleConfirm(pending, "confirm");
+        if (!accepted) return;
       }
+      setChangeSummary((current) => current.filter((item) => item !== change));
       showBanner("success", `已接受：${summarizeToolCall(change)}`);
     },
     [handleConfirm, messages, showBanner],
   );
 
   const handleRejectChange = useCallback(
-    (change: AppliedToolCall) => {
+    async (change: AppliedToolCall) => {
       const pending = messages.find((message) => message.pending)?.pending;
       if (pending) {
-        void handleConfirm(pending, "reject");
-        return;
+        const rejected = await handleConfirm(pending, "reject");
+        if (!rejected) return;
       }
-      setChangeSummary((current) =>
-        current.filter((item) => item !== change),
-      );
+      setChangeSummary((current) => current.filter((item) => item !== change));
       showBanner("info", `已拒绝：${summarizeToolCall(change)}（已从改动列表移除）`);
     },
     [handleConfirm, messages, showBanner],

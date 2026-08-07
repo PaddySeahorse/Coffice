@@ -3,11 +3,12 @@
 // Export dialog exposes the doc 14.6 checkboxes (bundle default-on, warning
 // on "包含版本历史").
 
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { INCLUDE_CO_WARNING_TEXT } from "./logic/exportDialog";
+import type { ChatStreamEvent } from "./types";
 
 const mocks = vi.hoisted(() => ({
   commits: [
@@ -232,5 +233,106 @@ describe("Agent Deck", () => {
       "sidebar-user",
       expect.any(Function),
     );
+  });
+
+  it("hides the confirm prompt once a pending change is accepted", async () => {
+    const { sendChatStream, sendConfirmationStream } = await import("./api/agentApi");
+    const user = userEvent.setup();
+    vi.mocked(sendChatStream).mockImplementationOnce(
+      async (
+        _message: string,
+        _sessionId: string | undefined,
+        _operator: string | undefined,
+        onEvent?: (event: ChatStreamEvent) => void,
+      ) => {
+        onEvent?.({
+          event: "needs_confirmation",
+          data: {
+            confirmation: {
+              token: "tok-123",
+              tool: "replaceRange",
+              summary: "替换第 1-4 段",
+              snapshot_hash: "abc",
+            },
+            reply: "该改动需要确认",
+          },
+        });
+        return {
+          status: "needs_confirmation",
+          reply: "该改动需要确认",
+          change_summary: [],
+          round_id: "r2",
+          needs_confirmation: true,
+          confirmation: null,
+          error: null,
+          session_id: "s1",
+        };
+      },
+    );
+
+    render(<App />);
+    await user.type(screen.getByLabelText("消息输入"), "修改第一段");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+
+    const confirmRow = await screen.findByTestId("confirm-row");
+    expect(confirmRow).toBeInTheDocument();
+
+    await user.click(within(confirmRow).getByTestId("btn-confirm"));
+    expect(sendConfirmationStream).toHaveBeenCalledWith(
+      { sessionId: "s1", token: "tok-123", action: "confirm" },
+      expect.any(Function),
+    );
+
+    // the resolved prompt disappears so the token cannot be submitted again
+    await waitFor(() => {
+      expect(screen.queryByTestId("confirm-row")).not.toBeInTheDocument();
+    });
+  });
+
+  it("hides the confirm prompt once a pending change is rejected", async () => {
+    const { sendChatStream } = await import("./api/agentApi");
+    const user = userEvent.setup();
+    vi.mocked(sendChatStream).mockImplementationOnce(
+      async (
+        _message: string,
+        _sessionId: string | undefined,
+        _operator: string | undefined,
+        onEvent?: (event: ChatStreamEvent) => void,
+      ) => {
+        onEvent?.({
+          event: "needs_confirmation",
+          data: {
+            confirmation: {
+              token: "tok-456",
+              tool: "insertText",
+              summary: "插入一段文字",
+              snapshot_hash: "def",
+            },
+            reply: "该改动需要确认",
+          },
+        });
+        return {
+          status: "needs_confirmation",
+          reply: "该改动需要确认",
+          change_summary: [],
+          round_id: "r3",
+          needs_confirmation: true,
+          confirmation: null,
+          error: null,
+          session_id: "s1",
+        };
+      },
+    );
+
+    render(<App />);
+    await user.type(screen.getByLabelText("消息输入"), "插入一段话");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+
+    const confirmRow = await screen.findByTestId("confirm-row");
+    await user.click(within(confirmRow).getByTestId("btn-reject"));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("confirm-row")).not.toBeInTheDocument();
+    });
   });
 });
