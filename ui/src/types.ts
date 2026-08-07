@@ -3,7 +3,7 @@
 
 export type AgentStatus = "idle" | "working" | "needs_confirmation" | "error";
 
-export type SectionId = "chat" | "context" | "tools" | "diff" | "history";
+export type SectionId = "chat" | "context" | "tools" | "diff" | "history" | "settings";
 
 export interface PendingConfirmation {
   token: string;
@@ -104,3 +104,26 @@ export type ExportResult = {
   warnings: string[];
   error?: string;
 };
+
+/** LLM endpoint configuration exposed by GET/POST /settings. */
+export interface LlmSettings {
+  base_url: string;
+  model: string;
+  /** Masked preview (``sk-ab…wxyz``); never the full key. */
+  api_key: string | null;
+  api_key_set: boolean;
+}
+
+/** Fields the Settings panel sends to POST /settings (api_key optional). */
+export interface LlmSettingsUpdate {
+  base_url: string;
+  model: string;
+  api_key?: string;
+}
+
+/** Result of the POST /settings/test connection probe. */
+export interface SettingsTestResult {
+  ok: boolean;
+  reply?: string;
+  error?: string;
+}

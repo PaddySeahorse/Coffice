@@ -839,6 +839,69 @@ input {
   color: #ff8f87;
 }
 
+/* ------------------------------------------------------------ settings */
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.settings-label {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.settings-field input {
+  width: 100%;
+  padding: 6px 10px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  outline: none;
+  color: var(--text);
+}
+
+.settings-field input:focus {
+  border-color: var(--accent);
+}
+
+.settings-field input::placeholder {
+  color: var(--text-faint);
+}
+
+.settings-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.settings-notice {
+  margin: 4px 0 10px;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  font-size: 12px;
+}
+
+.settings-notice--success {
+  background: rgba(46, 160, 67, 0.15);
+  border: 1px solid rgba(46, 160, 67, 0.5);
+  color: #7ee787;
+}
+
+.settings-notice--error {
+  background: rgba(218, 54, 51, 0.15);
+  border: 1px solid rgba(218, 54, 51, 0.5);
+  color: #ff8f87;
+}
+
+.settings-notice--info {
+  background: rgba(10, 132, 255, 0.12);
+  border: 1px solid rgba(10, 132, 255, 0.4);
+  color: var(--accent-hover);
+}
+
 /* ------------------------------------------------------------ scrollbars */
 
 ::-webkit-scrollbar {

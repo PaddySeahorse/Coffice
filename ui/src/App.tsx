@@ -23,6 +23,7 @@ import { ContextPanel } from "./components/ContextPanel";
 import { DiffPanel } from "./components/DiffPanel";
 import { ExportDialog } from "./components/ExportDialog";
 import { HistoryPanel } from "./components/HistoryPanel";
+import { SettingsPanel } from "./components/SettingsPanel";
 import { Sidebar } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
 import { ToolsPanel } from "./components/ToolsPanel";
@@ -489,6 +490,8 @@ export default function App() {
             onPreview={handlePreview}
           />
         );
+      case "settings":
+        return <SettingsPanel onNotify={showBanner} />;
     }
   })();
 

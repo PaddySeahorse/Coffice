@@ -141,6 +141,34 @@ def test_client_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     assert client.model
 
 
+def test_client_configure_hot_swaps_endpoint() -> None:
+    client = LLMClient(base_url="http://llm.test/v1", model="fake-model", api_key="old")
+    client.configure(
+        base_url=" http://other.test:1234/v1/ ", model="new-model", api_key="new-key"
+    )
+    assert client.base_url == "http://other.test:1234/v1"
+    assert client.model == "new-model"
+    assert client.api_key == "new-key"
+
+
+def test_client_configure_none_leaves_fields_untouched() -> None:
+    client = LLMClient(base_url="http://llm.test/v1", model="fake-model", api_key="keep")
+    client.configure()
+    assert client.base_url == "http://llm.test/v1"
+    assert client.model == "fake-model"
+    assert client.api_key == "keep"
+
+
+def test_client_configure_empty_resets_to_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(ENV_BASE_URL, raising=False)
+    monkeypatch.delenv(ENV_MODEL, raising=False)
+    client = LLMClient(base_url="http://llm.test/v1", model="fake-model", api_key="keep")
+    client.configure(base_url="", model="", api_key="")
+    assert client.base_url == DEFAULT_BASE_URL
+    assert client.model
+    assert client.api_key is None
+
+
 def test_client_transport_receives_payload() -> None:
     seen: dict = {}
 

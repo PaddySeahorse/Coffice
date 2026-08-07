@@ -95,6 +95,13 @@ export COFFICE_LLM_MODEL=gpt-4o-mini
 export COFFICE_LLM_API_KEY=sk-...
 ```
 
+The env vars are the **boot-time defaults**. At runtime the Agent Deck's
+**Settings** panel can change the endpoint too: it exposes the base URL,
+model, and API key (masked preview), a connection test (`POST /settings/test`
+pings the candidate endpoint with a one-token probe), and persists changes to
+`~/.coffice/llm.json` (`$COFFICE_LLM_CONFIG` relocates the file) so they
+survive restarts without touching your shell profile.
+
 Other relevant environment variables:
 
 - `COFFICE_DOC_PATH` — `.docx`/`.odt` the agent opens (default: empty in-memory doc).
