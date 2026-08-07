@@ -28,6 +28,9 @@ from coffice.agent.agent_api import (
     create_http_server,
     handle_chat,
     handle_confirm,
+    handle_get_settings,
+    handle_set_settings,
+    handle_settings_test,
 )
 from coffice.agent.agent_loop import (
     DEFAULT_MAX_TOOL_CALLS,
@@ -54,6 +57,16 @@ from coffice.agent.llm_client import (
     parse_chat_response,
     parse_sse_events,
 )
+from coffice.agent.llm_settings import (
+    apply_persisted,
+    apply_to_client,
+    current_values,
+    effective_settings,
+    load_settings,
+    mask_api_key,
+    save_settings,
+    settings_path,
+)
 
 __all__ = [
     "AgentSession",
@@ -74,13 +87,24 @@ __all__ = [
     "PendingConfirmation",
     "ToolCall",
     "ToolSpec",
+    "apply_persisted",
+    "apply_to_client",
     "build_handler",
     "build_sessions",
     "build_system_prompt",
     "create_http_server",
+    "current_values",
+    "effective_settings",
     "function_tool",
     "handle_chat",
     "handle_confirm",
+    "handle_get_settings",
+    "handle_set_settings",
+    "handle_settings_test",
+    "load_settings",
+    "mask_api_key",
     "parse_chat_response",
     "parse_sse_events",
+    "save_settings",
+    "settings_path",
 ]

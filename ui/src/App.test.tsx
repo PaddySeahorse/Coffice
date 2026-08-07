@@ -124,6 +124,22 @@ vi.mock("./api/shell", () => ({
   pingShell: () => undefined,
 }));
 
+vi.mock("./api/settingsApi", () => ({
+  fetchSettings: vi.fn(async () => ({
+    base_url: "http://127.0.0.1:11434/v1",
+    model: "qwen2.5:7b",
+    api_key: null,
+    api_key_set: false,
+  })),
+  saveSettings: vi.fn(async () => ({
+    base_url: "http://127.0.0.1:11434/v1",
+    model: "qwen2.5:7b",
+    api_key: null,
+    api_key_set: false,
+  })),
+  testSettings: vi.fn(async () => ({ ok: true, reply: "pong" })),
+}));
+
 describe("Agent Deck", () => {
   it("renders the section rail and the status bar with mock data", async () => {
     render(<App />);
@@ -132,11 +148,20 @@ describe("Agent Deck", () => {
     expect(screen.getByTestId("statusbar-agent")).toHaveTextContent("Agent: idle");
     expect(await screen.findByTestId("statusbar-co")).toHaveTextContent("co: 2 commits");
     // section rail
-    for (const section of ["chat", "context", "tools", "diff", "history"]) {
+    for (const section of ["chat", "context", "tools", "diff", "history", "settings"]) {
       expect(screen.getByTestId(`rail-${section}`)).toBeInTheDocument();
     }
     // chat panel is the default section
     expect(screen.getByTestId("chat-panel")).toBeInTheDocument();
+  });
+
+  it("switches to the Settings panel (LLM endpoint config)", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByTestId("rail-settings"));
+    expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+    expect(screen.getByText("LLM 配置")).toBeInTheDocument();
   });
 
   it("switches between the Tools, Diff and History panels", async () => {

@@ -16,6 +16,7 @@ export const SECTIONS: SectionDef[] = [
   { id: "tools", label: "Tools", glyph: "🛠" },
   { id: "diff", label: "Diff", glyph: "⇄" },
   { id: "history", label: "History", glyph: "🕘" },
+  { id: "settings", label: "Settings", glyph: "⚙" },
 ];
 
 interface SidebarProps {

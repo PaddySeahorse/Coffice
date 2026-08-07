@@ -312,6 +312,29 @@ class LLMClient:
                 f"(set {ENV_BASE_URL} / {ENV_MODEL})"
             )
 
+    def configure(
+        self,
+        base_url: str | None = None,
+        model: str | None = None,
+        api_key: str | None = None,
+    ) -> None:
+        """Hot-swap the endpoint configuration (driven by the WebUI Settings).
+
+        ``None`` leaves a field untouched. An empty ``base_url``/``model``
+        resets to the defaults; an empty ``api_key`` clears the bearer token
+        (local servers need none). Existing sessions keep their message
+        history, so changing the endpoint mid-conversation just points the
+        next LLM call at the new server.
+        """
+        if base_url is not None:
+            stripped = str(base_url).strip().rstrip("/")
+            self.base_url = stripped or DEFAULT_BASE_URL
+        if model is not None:
+            stripped = str(model).strip()
+            self.model = stripped or DEFAULT_MODEL
+        if api_key is not None:
+            self.api_key = str(api_key).strip() or None
+
     def chat(
         self,
         messages: list[dict[str, Any]],

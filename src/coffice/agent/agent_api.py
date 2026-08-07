@@ -30,6 +30,17 @@ exposes, so contracts stay aligned):
 - ``GET /diff``     -- diff between two commit hashes via the ``getDiff`` tool
                        (``?h1=&h2=&docId=``).
 
+The WebUI also configures the LLM endpoint at runtime through the Settings
+panel:
+
+- ``GET /settings``        -- current LLM base URL / model / masked API key.
+- ``POST /settings``       -- ``{"base_url": "...", "model": "...", "api_key": "..."}``
+                              hot-swaps the in-process LLMClient and persists
+                              the change to ``~/.coffice/llm.json`` (env vars
+                              stay the boot-time defaults).
+- ``POST /settings/test``  -- pings a candidate endpoint with a one-token
+                              probe call; never persists.
+
 A ``GET /health`` reports liveness. Everything else is stdlib
 ``http.server`` (a ``ThreadingHTTPServer``) so the MVP keeps dependencies
 light; swap for FastAPI in Phase 2 if needed.
@@ -63,7 +74,19 @@ from coffice.agent.agent_loop import (
     ChatResult,
     _server_call,
 )
-from coffice.agent.llm_client import LLMClient
+from coffice.agent.llm_client import (
+    DEFAULT_BASE_URL,
+    DEFAULT_MODEL,
+    LLMClient,
+    LLMError,
+)
+from coffice.agent.llm_settings import (
+    apply_persisted,
+    apply_to_client,
+    current_values,
+    effective_settings,
+    save_settings,
+)
 from coffice.mcp.middleware import RoundTracker
 from coffice.mcp.server import create_server
 
@@ -143,6 +166,7 @@ def build_sessions(
     tracker = round_tracker or RoundTracker()
     mcp = mcp_server or create_server(round_tracker=tracker)
     llm = llm_client or LLMClient()
+    apply_persisted(llm)
     return AgentSessions(
         llm_client=llm,
         mcp_server=mcp,
@@ -370,6 +394,79 @@ def handle_diff(
 
 
 # ============================================================================
+# LLM settings: the WebUI Settings panel configures the endpoint at runtime.
+# GET /settings returns the read-safe payload (masked key); POST /settings
+# hot-swaps the in-process LLMClient and persists to ~/.coffice/llm.json;
+# POST /settings/test pings the candidate endpoint with a tiny probe call.
+# ============================================================================
+
+
+def handle_get_settings(sessions: AgentSessions) -> tuple[int, dict[str, Any]]:
+    """Process ``GET /settings``; returns the current LLM endpoint config."""
+    try:
+        settings = effective_settings(sessions._llm)  # noqa: SLF001
+    except Exception as exc:  # noqa: BLE001 - surface introspection failure
+        logger.warning("settings introspection failed: %s", exc)
+        return 500, {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+    return 200, {"ok": True, "settings": settings}
+
+
+def handle_set_settings(
+    sessions: AgentSessions, body: dict[str, Any]
+) -> tuple[int, dict[str, Any]]:
+    """Process ``POST /settings``; applies + persists an endpoint change.
+
+    Body fields (all optional) mirror the env vars: ``base_url``, ``model``,
+    ``api_key``. An empty ``api_key`` clears the stored token; a missing
+    ``api_key`` leaves it untouched.
+    """
+    updates: dict[str, Any] = {}
+    if "base_url" in body:
+        updates["base_url"] = body.get("base_url")
+    if "model" in body:
+        updates["model"] = body.get("model")
+    if "api_key" in body:
+        updates["api_key"] = body.get("api_key")
+    if not updates:
+        return 400, {"ok": False, "error": "no settings provided"}
+    for field, value in updates.items():
+        if value is None or not isinstance(value, str):
+            return 400, {"ok": False, "error": f"'{field}' must be a string"}
+    apply_to_client(sessions._llm, updates)  # noqa: SLF001
+    save_settings(current_values(sessions._llm))  # noqa: SLF001
+    logger.info(
+        "LLM settings updated via WebUI: base_url=%s model=%s",
+        sessions._llm.base_url,  # noqa: SLF001
+        sessions._llm.model,  # noqa: SLF001
+    )
+    return 200, {"ok": True, "settings": effective_settings(sessions._llm)}  # noqa: SLF001
+
+
+def handle_settings_test(
+    sessions: AgentSessions, body: dict[str, Any]
+) -> tuple[int, dict[str, Any]]:
+    """Process ``POST /settings/test``; pings the candidate endpoint.
+
+    Uses the proposed ``base_url``/``model``/``api_key`` (falling back to the
+    current client config) with a one-token probe chat; never persists.
+    """
+    current = current_values(sessions._llm)  # noqa: SLF001
+    base_url = body.get("base_url") or current["base_url"] or DEFAULT_BASE_URL
+    model = body.get("model") or current["model"] or DEFAULT_MODEL
+    api_key = body.get("api_key")
+    if api_key is None:
+        api_key = current["api_key"]
+    try:
+        probe = LLMClient(
+            base_url=str(base_url), model=str(model), api_key=api_key, timeout=20.0
+        )
+        reply = probe.chat([{"role": "user", "content": "ping"}], max_tokens=8)
+        return 200, {"ok": True, "reply": (reply.content or "")[:200]}
+    except LLMError as exc:
+        return 200, {"ok": False, "error": str(exc)}
+
+
+# ============================================================================
 # http.server facade
 # ============================================================================
 
@@ -431,6 +528,10 @@ def build_handler(sessions: AgentSessions) -> type[BaseHTTPRequestHandler]:
                 status, payload = handle_confirm(sessions, body)
             elif path == "/tool":
                 status, payload = handle_tool_call(sessions, body)
+            elif path == "/settings":
+                status, payload = handle_set_settings(sessions, body)
+            elif path == "/settings/test":
+                status, payload = handle_settings_test(sessions, body)
             else:
                 status, payload = 404, {"ok": False, "error": "not found"}
             self._send_json(status, payload)
@@ -451,6 +552,8 @@ def build_handler(sessions: AgentSessions) -> type[BaseHTTPRequestHandler]:
                 status, payload = handle_history(sessions, params)
             elif path == "/diff":
                 status, payload = handle_diff(sessions, params)
+            elif path == "/settings":
+                status, payload = handle_get_settings(sessions)
             else:
                 status, payload = 404, {"ok": False, "error": "not found"}
             self._send_json(status, payload)

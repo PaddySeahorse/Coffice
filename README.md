@@ -110,7 +110,10 @@ make smoke        # end-to-end Route 1 smoke test (skips gracefully when LO/co a
 
 The LLM endpoint is configured via `COFFICE_LLM_BASE_URL` /
 `COFFICE_LLM_MODEL` / `COFFICE_LLM_API_KEY` (Ollama, LM Studio, or any
-OpenAI-compatible cloud API — see `docs/route1.md` §1.4).
+OpenAI-compatible cloud API — see `docs/route1.md` §1.4). These env vars are
+the boot-time defaults; the Agent Deck's **Settings** panel can also change
+them at runtime (base URL / model / API key, plus a connection test) and
+persists the change to `~/.coffice/llm.json` for the next launch.
 
 The `co` CLI (version-control snapshots) is a separate project
 (<https://github.com/PaddySeahorse/co>, Git-style snapshots); its quickstart
