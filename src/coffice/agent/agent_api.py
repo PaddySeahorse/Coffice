@@ -96,6 +96,51 @@ logger = logging.getLogger(__name__)
 DEFAULT_AGENT_PORT = 8790
 ENV_AGENT_HOST = "COFFICE_AGENT_HOST"
 ENV_AGENT_PORT = "COFFICE_AGENT_PORT"
+ENV_DOC_DIR = "COFFICE_DOC_DIR"
+#: default directory served by ``GET /download`` (documents exported/edited
+#: by the agent). Override with ``COFFICE_DOC_DIR``.
+DEFAULT_DOC_DIR = "/workspace/documents"
+
+
+def _resolve_download_path(raw: str) -> tuple[str | None, tuple[int, dict[str, Any]] | None]:
+    """Resolve a ``/download?path=`` query to a file inside the download area.
+
+    Returns ``(filepath, None)`` on success, or ``(None, (status, payload))``
+    with a structured error when the path is missing, outside the allowed
+    directory, or does not exist. ``os.path.realpath`` collapses any ``..``
+    traversal before the containment check.
+    """
+    if not raw:
+        return None, (400, {"ok": False, "error": "'path' query parameter is required"})
+    base = os.path.realpath(os.environ.get(ENV_DOC_DIR, DEFAULT_DOC_DIR))
+    target = os.path.realpath(raw)
+    if target != base and not target.startswith(base + os.sep):
+        return None, (403, {"ok": False, "error": "path outside the download area"})
+    if not os.path.isfile(target):
+        return None, (404, {"ok": False, "error": "file not found"})
+    return target, None
+
+
+def handle_download(params: dict[str, Any]) -> tuple[int, dict[str, Any]] | tuple[bytes, str, str]:
+    """Process ``GET /download``; returns ``(status, payload)`` or file bytes.
+
+    The successful shape is ``(raw_bytes, content_type, filename)`` consumed
+    by the HTTP layer; errors use the standard JSON ``(status, payload)``.
+    """
+    raw = params.get("path")
+    if not isinstance(raw, str):
+        return 400, {"ok": False, "error": "'path' query parameter is required"}
+    target, err = _resolve_download_path(raw)
+    if err is not None:
+        return err
+    assert target is not None
+    import mimetypes
+
+    content_type = mimetypes.guess_type(target)[0] or "application/octet-stream"
+    with open(target, "rb") as handle:
+        data = handle.read()
+    return data, content_type, os.path.basename(target)
+
 
 _EMPTY_CHAT_RESULT = ChatResult(status="error", error="empty user message")
 
@@ -536,6 +581,16 @@ def build_handler(sessions: AgentSessions) -> type[BaseHTTPRequestHandler]:
                 status, payload = 404, {"ok": False, "error": "not found"}
             self._send_json(status, payload)
 
+        def _send_file(self, data: bytes, content_type: str, filename: str) -> None:
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header(
+                "Content-Disposition", f'attachment; filename="{filename}"'
+            )
+            self.end_headers()
+            self.wfile.write(data)
+
         def do_GET(self) -> None:  # noqa: N802 - http.server dispatch name
             path, _, query = self.path.partition("?")
             path = path.rstrip("/")
@@ -543,6 +598,15 @@ def build_handler(sessions: AgentSessions) -> type[BaseHTTPRequestHandler]:
                 key: values[0] if values else ""
                 for key, values in urllib.parse.parse_qs(query).items()
             }
+            if path == "/download":
+                result = handle_download(params)
+                if isinstance(result, tuple) and len(result) == 3:
+                    data, content_type, filename = result
+                    self._send_file(data, content_type, filename)
+                else:
+                    status, payload = result
+                    self._send_json(status, payload)
+                return
             if path in ("/health", "/"):
                 self._send_json(200, {"ok": True, "service": "coffice-agent"})
                 return

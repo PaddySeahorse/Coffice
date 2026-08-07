@@ -10,6 +10,7 @@ import {
   exportDialogReducer,
   exportWarnings,
 } from "../logic/exportDialog";
+import { getApiConfig } from "../api/config";
 import type { ExportResult } from "../types";
 
 interface ExportDialogProps {
@@ -103,6 +104,17 @@ export function ExportDialog({ open, onClose, onExport }: ExportDialogProps) {
         {state.done && state.lastResult && (
           <div className="export-result" data-testid="export-result">
             <p>导出成功：{state.lastResult.path}</p>
+            {state.lastResult.path && (
+              <p>
+                <a
+                  href={`${getApiConfig().agentBaseUrl}download?path=${encodeURIComponent(state.lastResult.path)}`}
+                  className="btn btn--primary"
+                  data-testid="link-download"
+                >
+                  点击下载
+                </a>
+              </p>
+            )}
             {state.lastResult.bundlePath && <p>版本历史：{state.lastResult.bundlePath}</p>}
             {state.lastResult.packagePath && <p>打包：{state.lastResult.packagePath}</p>}
           </div>
