@@ -99,6 +99,9 @@ ENV_DOC_DIR = "COFFICE_DOC_DIR"
 #: default directory served by ``GET /download`` (documents exported/edited
 #: by the agent). Override with ``COFFICE_DOC_DIR``.
 DEFAULT_DOC_DIR = "/workspace/documents"
+#: cap for ``GET /download`` responses; larger files are refused so a giant
+#: export cannot exhaust server memory.
+MAX_DOWNLOAD_BYTES = 64 * 1024 * 1024
 
 
 def _resolve_download_path(raw: str) -> tuple[str | None, tuple[int, dict[str, Any]] | None]:
@@ -133,11 +136,22 @@ def handle_download(params: dict[str, Any]) -> tuple[int, dict[str, Any]] | tupl
     if err is not None:
         return err
     assert target is not None
+    try:
+        size = os.path.getsize(target)
+    except OSError as exc:
+        logger.warning("download stat failed: %s", exc)
+        return 500, {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+    if size > MAX_DOWNLOAD_BYTES:
+        return 413, {"ok": False, "error": "file too large to download"}
     import mimetypes
 
     content_type = mimetypes.guess_type(target)[0] or "application/octet-stream"
-    with open(target, "rb") as handle:
-        data = handle.read()
+    try:
+        with open(target, "rb") as handle:
+            data = handle.read()
+    except OSError as exc:
+        logger.warning("download read failed: %s", exc)
+        return 500, {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
     return data, content_type, os.path.basename(target)
 
 
