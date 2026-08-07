@@ -39,15 +39,15 @@ export function ChatPanel({ messages, busy, onSend, onConfirm }: ChatPanelProps)
                 message.error ? " chat-message--error" : ""
               }`}
             >
-              <header className="chat-message__meta">
-                {message.role === "user"
-                  ? "You"
-                  : message.role === "assistant"
-                    ? "AI"
-                    : message.role === "tool"
-                      ? "Tool"
-                      : "System"}
-              </header>
+              {message.role !== "user" && (
+                <header className="chat-message__meta">
+                  {message.role === "assistant"
+                      ? "AI"
+                      : message.role === "tool"
+                        ? "Tool"
+                        : "System"}
+                </header>
+              )}
               <div className="chat-message__content">{message.content}</div>
               {message.toolSummary && (
                 <span className="tool-chip">{message.toolSummary}</span>
