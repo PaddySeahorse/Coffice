@@ -78,7 +78,6 @@ from coffice.agent.llm_client import (
     DEFAULT_BASE_URL,
     DEFAULT_MODEL,
     LLMClient,
-    LLMError,
 )
 from coffice.agent.llm_settings import (
     apply_persisted,
@@ -507,8 +506,9 @@ def handle_settings_test(
         )
         reply = probe.chat([{"role": "user", "content": "ping"}], max_tokens=8)
         return 200, {"ok": True, "reply": (reply.content or "")[:200]}
-    except LLMError as exc:
-        return 200, {"ok": False, "error": str(exc)}
+    except Exception as exc:  # noqa: BLE001 - probe failures are structured errors
+        logger.warning("settings probe failed: %s", exc)
+        return 200, {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
 
 
 # ============================================================================
