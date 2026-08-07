@@ -45,3 +45,18 @@ select = ["E", "F", "W", "I", "UP", "B"]
 [tool.mypy]
 python_version = "3.11"
 packages = ["coffice"]
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+commit_parser = "conventional"
+
+[tool.semantic_release.changelog]
+exclude_commit_patterns = [
+    "chore(?:\\([^)]*?\\))?: .+",
+    "ci(?:\\([^)]*?\\))?: .+",
+    "docs(?:\\([^)]*?\\))?: .+",
+    "style(?:\\([^)]*?\\))?: .+",
+    "refactor(?:\\([^)]*?\\))?: .+",
+    "test(?:\\([^)]*?\\))?: .+",
+    "Initial [Cc]ommit.*",
+]
