@@ -17,10 +17,35 @@ export const DEFAULT_LLM_SETTINGS: LlmSettings = {
   api_key_set: false,
 };
 
-async function postJson<T>(path: string, body: unknown): Promise<T> {
+//: The backend /settings/test probe runs up to 20s, so the frontend must not
+//: abort the fetch with the generic 3s request timeout (which surfaces as
+//: "Fetch is aborted" on slow or unreachable endpoints).
+const SETTINGS_TEST_TIMEOUT_MS = 25_000;
+
+/** Translate a failed probe into a user-facing message (timeouts included). */
+export function probeErrorMessage(err: unknown): string {
+  if (
+    err &&
+    typeof err === "object" &&
+    "name" in err &&
+    (err as { name?: unknown }).name === "AbortError"
+  ) {
+    return "连接测试超时：25 秒内未收到响应，请检查 Base URL 是否可达";
+  }
+  return err instanceof Error ? err.message : String(err);
+}
+
+async function postJson<T>(
+  path: string,
+  body: unknown,
+  timeoutMs?: number,
+): Promise<T> {
   const cfg = getApiConfig();
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), cfg.requestTimeoutMs);
+  const timer = window.setTimeout(
+    () => controller.abort(),
+    timeoutMs ?? cfg.requestTimeoutMs,
+  );
   try {
     const response = await fetch(`${cfg.agentBaseUrl}${path}`, {
       method: "POST",
@@ -83,11 +108,12 @@ export async function testSettings(
   };
   if (update.api_key) body.api_key = update.api_key;
   try {
-    return await postJson<SettingsTestResult>("settings/test", body);
+    return await postJson<SettingsTestResult>(
+      "settings/test",
+      body,
+      SETTINGS_TEST_TIMEOUT_MS,
+    );
   } catch (err) {
-    return {
-      ok: false,
-      error: err instanceof Error ? err.message : String(err),
-    };
+    return { ok: false, error: probeErrorMessage(err) };
   }
 }
