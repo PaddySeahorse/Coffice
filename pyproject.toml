@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "coffice"
-version = "1.0.0"
+version = "0.1.0"
 description = "AI-first office suite: LibreOffice rendering core with an MCP bridge for LLM agents"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -49,6 +49,7 @@ packages = ["coffice"]
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
 commit_parser = "conventional"
+allow_zero_version = true
 
 [tool.semantic_release.changelog]
 exclude_commit_patterns = [
