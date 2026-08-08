@@ -35,7 +35,6 @@ from com.sun.star.lang import XComponent, XInitialization
 from com.sun.star.ui import (
     LayoutSize,
     XSidebarPanel,
-    XSidebarProvider,
     XToolPanel,
     XUIElement,
     XUIElementFactory,
@@ -142,7 +141,9 @@ def _toggle_sidebar(ctx) -> None:
         if controller is not None:
             provider = None
             try:
-                provider = uno.queryInterface(XSidebarProvider, controller)
+                provider = controller.queryInterface(
+                    uno.getTypeByName("com.sun.star.ui.XSidebarProvider")
+                )
             except Exception:
                 provider = None
             if provider is not None:
