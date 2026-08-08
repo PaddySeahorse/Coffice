@@ -271,8 +271,7 @@ class LoManager:
             "--nodefault",
             "--nofirststartwizard",
             f"-env:UserInstallation={Path(profile_dir).resolve().as_uri()}",
-            "--accept",
-            self.accept_string,
+            f"--accept={self.accept_string}",
         ]
 
     def _new_profile_dir(self) -> str:
