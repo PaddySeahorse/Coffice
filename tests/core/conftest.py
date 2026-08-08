@@ -15,7 +15,7 @@ import pytest
 from coffice.core.lo_manager import LoManager
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def free_port() -> int:
     """Return a currently-free TCP port on 127.0.0.1."""
     with socket.socket() as sock:
