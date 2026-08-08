@@ -92,13 +92,9 @@ def _make_props(**kwargs):
 def _dispatch_uno(ctx, frame, command: str) -> None:
     """Dispatch a ``.uno:`` command on ``frame`` (e.g. ``.uno:Open``, ``.uno:Save``)."""
     try:
-        url = _create(ctx, "com.sun.star.util.URL")
-        url.Complete = command
-        transformer = _create(ctx, "com.sun.star.util.URLTransformer")
-        transformer.parseStrict(url)
-        dispatcher = frame.queryDispatch(url, "", 0)
-        if dispatcher is not None:
-            dispatcher.dispatch(url, ())
+        helper = _create(ctx, "com.sun.star.frame.DispatchHelper")
+        if helper is not None:
+            helper.executeDispatch(frame, command, "", 0, ())
     except Exception:
         traceback.print_exc()
 
