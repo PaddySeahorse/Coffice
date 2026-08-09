@@ -2,6 +2,32 @@
 
 <!-- version list -->
 
+## v0.2.1 (2026-08-09)
+
+### Bug Fixes
+
+- **core**: Align Document with real LibreOffice UNO behaviour
+  ([`08f9c60`](https://github.com/PaddySeahorse/Coffice/commit/08f9c60ae9ed0a7c2e77ae474fa4b4fba5b6e501))
+
+- **core**: Pass --accept as a single argument to soffice
+  ([`d0e92f1`](https://github.com/PaddySeahorse/Coffice/commit/d0e92f18ec8faef7b9c101bf9b3d8facd4c993a1))
+
+- **sidebar**: Dispatch .uno commands via DispatchHelper
+  ([`9b22327`](https://github.com/PaddySeahorse/Coffice/commit/9b2232717169c176c8fcbf4859f019f2929803de))
+
+- **sidebar**: Query XSidebarProvider via instance queryInterface
+  ([`6c134f7`](https://github.com/PaddySeahorse/Coffice/commit/6c134f723c2b5adba078262c804186cee2ed474b))
+
+- **test**: Fix MCP integration fixtures and tool-result unpacking
+  ([`3d30124`](https://github.com/PaddySeahorse/Coffice/commit/3d3012428fa36adc46f9b7a0a441fa08a0b1fd2d))
+
+- **test**: Give free_port session scope in core conftest
+  ([`4e7ab32`](https://github.com/PaddySeahorse/Coffice/commit/4e7ab322b53bf7a4048e9fe610db0f52caafa4cb))
+
+- **test**: Make core fixtures robust against a real LibreOffice
+  ([`e636886`](https://github.com/PaddySeahorse/Coffice/commit/e63688663b16081ea13a9ceb068dbfbdc342fa4e))
+
+
 ## v0.2.0 (2026-08-07)
 
 ### Bug Fixes
