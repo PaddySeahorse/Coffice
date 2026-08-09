@@ -53,11 +53,11 @@ def test_get_outline_and_styles_against_live_document(
     )
     server: FastMCP = create_server(registry=registry, co_client=FakeCoClient())
 
-    outline = asyncio.run(server.call_tool("getOutline", {"docId": DEFAULT_DOC_ID}))
+    outline = call_tool(server, "getOutline", {"docId": DEFAULT_DOC_ID})
     assert outline["docId"] == DEFAULT_DOC_ID
     assert isinstance(outline["outline"], list)
 
-    styles = asyncio.run(server.call_tool("getStyles", {"docId": DEFAULT_DOC_ID}))
+    styles = call_tool(server, "getStyles", {"docId": DEFAULT_DOC_ID})
     assert styles["docId"] == DEFAULT_DOC_ID
     assert "paragraph" in styles["styles"]
     assert isinstance(styles["styles"]["paragraph"], list)
@@ -78,10 +78,10 @@ def test_get_redlines_and_tables_against_live_document(
     )
     server: FastMCP = create_server(registry=registry, co_client=FakeCoClient())
 
-    tables = asyncio.run(server.call_tool("getTables", {"docId": DEFAULT_DOC_ID}))
+    tables = call_tool(server, "getTables", {"docId": DEFAULT_DOC_ID})
     assert isinstance(tables["tables"], list)
 
-    redlines = asyncio.run(server.call_tool("getRedlines", {"docId": DEFAULT_DOC_ID}))
+    redlines = call_tool(server, "getRedlines", {"docId": DEFAULT_DOC_ID})
     assert isinstance(redlines["redlines"], list)
 
 
