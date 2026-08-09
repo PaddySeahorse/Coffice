@@ -163,10 +163,12 @@ class Document:
         :meth:`replace_range`, :meth:`apply_style`).
         """
         enum = self._doc.Text.createEnumeration()
+        paragraphs: list[Any] = []
+        while enum.hasMoreElements():
+            paragraphs.append(enum.nextElement())
         outline: list[dict[str, Any]] = []
         offset = 0
-        while enum.hasMoreElements():
-            element = enum.nextElement()
+        for index, element in enumerate(paragraphs):
             if not _supports_service(element, "com.sun.star.text.Paragraph"):
                 continue
             paragraph_text = str(element.String)
@@ -179,15 +181,17 @@ class Document:
                         "start": offset,
                         "end": offset + len(paragraph_text),
                         "level": level,
-                        "style": str(element.ParagraphStyleName),
+                        "style": str(element.ParaStyleName),
                         "text": paragraph_text,
                     }
                 )
             offset += len(paragraph_text)
+            if index < len(paragraphs) - 1:
+                offset += 1  # paragraph separator, matching get_text() offsets
         return outline
 
     def _heading_level(self, paragraph: Any) -> int | None:
-        style = str(getattr(paragraph, "ParagraphStyleName", "") or "")
+        style = str(getattr(paragraph, "ParaStyleName", "") or "")
         for candidate in (style, style.lower()):
             for prefix in ("Heading", "heading"):
                 if candidate.startswith(prefix):
@@ -266,9 +270,22 @@ class Document:
         cursor = self._doc.Text.createTextCursor()
         cursor.gotoStart(False)
         cursor.goRight(offset, False)
+        current = str(self._doc.Text.getString())
+        if (
+            offset == doc_len
+            and "\n" in str(text)
+            and current
+            and not current.endswith("\n")
+        ):
+            self._doc.Text.insertControlCharacter(cursor, 0, False)
         if style:
             cursor.setPropertyValue("ParaStyleName", style)
-        self._doc.Text.insertString(cursor, text, False)
+        parts = str(text).split("\n")
+        for index, part in enumerate(parts):
+            if index > 0:
+                self._doc.Text.insertControlCharacter(cursor, 0, False)
+            if part:
+                self._doc.Text.insertString(cursor, part, False)
         return offset + len(text)
 
     def replace_range(
@@ -328,7 +345,9 @@ class Document:
                 "IsLandscape", size["width"] > size["height"]
             )
         if "columns" in opts:
-            page.setPropertyValue("Columns", self._create_text_columns(opts["columns"]))
+            page.setPropertyValue(
+                "TextColumns", self._create_text_columns(opts["columns"])
+            )
 
     def _get_page_style(self) -> Any:
         families = self._doc.getStyleFamilies()
@@ -344,7 +363,7 @@ class Document:
 
     def _create_text_columns(self, count: int) -> Any:
         columns = self._doc.createInstance("com.sun.star.text.TextColumns")
-        columns.Count = int(count)
+        columns.setColumnCount(int(count))
         return columns
 
     # -- track changes (display only) ------------------------------------------
@@ -382,13 +401,41 @@ class Document:
         The agent never calls this -- it is exposed for the human flow only.
         """
         self._doc.setPropertyValue("RecordChanges", True)
-        self._doc.setPropertyValue("RedlineProtection", False)
         self._track_changes_enabled = True
 
     def disable_track_changes(self) -> None:
         """Turn off LO track changes."""
         self._doc.setPropertyValue("RecordChanges", False)
         self._track_changes_enabled = False
+
+    def get_redlines(self) -> list[dict[str, Any]]:
+        """Return the document's native LO redlines (human review flow).
+
+        Each entry carries ``type`` (e.g. ``"Insert"``/``"Delete"``),
+        ``text`` and ``author``. The agent-facing redline list is computed
+        virtually by :mod:`coffice.core.diff_projector`; this reads LO's own
+        track-changes records, which are only produced when the human (or
+        :meth:`enable_track_changes`) turns ``RecordChanges`` on.
+        """
+        try:
+            redlines = self._doc.getRedlines()
+        except Exception:
+            return []
+        enum = redlines.createEnumeration()
+        result: list[dict[str, Any]] = []
+        while enum.hasMoreElements():
+            redline = enum.nextElement()
+            try:
+                result.append(
+                    {
+                        "type": str(redline.getPropertyValue("RedlineType")),
+                        "text": str(redline.getString()),
+                        "author": str(redline.getPropertyValue("RedlineAuthor")),
+                    }
+                )
+            except Exception:
+                continue
+        return result
 
     def replace_all_text(self, new_text: str) -> int:
         """Replace the whole document body with ``new_text``; return new length.
