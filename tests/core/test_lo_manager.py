@@ -58,15 +58,17 @@ def test_availability_checks_return_bools() -> None:
     assert LO_UNAVAILABLE == (not lo_available())
 
 
-def test_start_without_binary_raises() -> None:
-    manager = LoManager(soffice_bin="/nonexistent/soffice")
+def test_start_without_binary_raises(free_port: int) -> None:
+    manager = LoManager(soffice_bin="/nonexistent/soffice", port=free_port)
     with pytest.raises(LibreOfficeUnavailableError):
         manager.start()
 
 
-def test_start_with_nonexistent_binary_raises_unavailable_with_pyuno(monkeypatch) -> None:
+def test_start_with_nonexistent_binary_raises_unavailable_with_pyuno(
+    free_port: int, monkeypatch
+) -> None:
     monkeypatch.setattr("coffice.core.lo_manager.pyuno_available", lambda: True)
-    manager = LoManager(soffice_bin="/nonexistent/soffice")
+    manager = LoManager(soffice_bin="/nonexistent/soffice", port=free_port)
     with pytest.raises(LibreOfficeUnavailableError):
         manager.start()
 

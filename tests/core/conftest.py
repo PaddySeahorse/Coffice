@@ -15,7 +15,7 @@ import pytest
 from coffice.core.lo_manager import LoManager
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def free_port() -> int:
     """Return a currently-free TCP port on 127.0.0.1."""
     with socket.socket() as sock:
@@ -24,9 +24,17 @@ def free_port() -> int:
 
 
 @pytest.fixture(scope="session")
-def lo_manager(free_port: int) -> LoManager:
+def lo_port() -> int:
+    """Session-scoped free TCP port for the shared LibreOffice instance."""
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
+
+
+@pytest.fixture(scope="session")
+def lo_manager(lo_port: int) -> LoManager:
     """A running headless LibreOffice instance, torn down after the session."""
-    manager = LoManager(port=free_port, startup_timeout=60.0)
+    manager = LoManager(port=lo_port, startup_timeout=60.0)
     manager.ensure_running()
     try:
         yield manager

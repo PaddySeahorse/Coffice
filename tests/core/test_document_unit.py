@@ -5,6 +5,8 @@ from __future__ import annotations
 import sys
 import types
 
+import pytest
+
 from coffice.core.document import (
     Document,
     _filter_for,
@@ -28,17 +30,54 @@ def _install_fake_property_value() -> type:
     return FakePropertyValue
 
 
+@pytest.fixture
+def fake_property_value() -> type:
+    """Inject a fake ``PropertyValue`` and restore ``sys.modules`` afterwards.
+
+    ``_make_props`` imports ``com.sun.star.beans.PropertyValue`` at call time,
+    so a permanently-installed fake would leak into later LO integration
+    tests (a plain Python class cannot be marshalled to UNO and any
+    ``storeToURL`` would fail). ``monkeypatch`` cannot remove the module
+    itself, so this fixture snapshots and restores both the module map and the
+    attribute.
+    """
+    created = [
+        name
+        for name in ("com", "com.sun", "com.sun.star", "com.sun.star.beans")
+        if name not in sys.modules
+    ]
+    for name in ("com", "com.sun", "com.sun.star", "com.sun.star.beans"):
+        sys.modules.setdefault(name, types.ModuleType(name))
+    beans = sys.modules["com.sun.star.beans"]
+    had_attr = hasattr(beans, "PropertyValue")
+    original = getattr(beans, "PropertyValue", None)
+
+    class FakePropertyValue:
+        def __init__(self) -> None:
+            self.Name: str | None = None
+            self.Value: object = None
+
+    beans.PropertyValue = FakePropertyValue  # type: ignore[attr-defined]
+    yield FakePropertyValue
+    if had_attr:
+        beans.PropertyValue = original
+    else:
+        delattr(beans, "PropertyValue")
+    for name in created:
+        sys.modules.pop(name, None)
+
+
 class FakeParagraph:
-    ParagraphStyleName = "Heading 3"
+    ParaStyleName = "Heading 3"
 
 
 class FakeOutlineParagraph:
-    ParagraphStyleName = "My Custom Style"
+    ParaStyleName = "My Custom Style"
     OutlineLevel = 2
 
 
 class FakeBodyParagraph:
-    ParagraphStyleName = "Text Body"
+    ParaStyleName = "Text Body"
     OutlineLevel = 0
 
 
@@ -70,11 +109,10 @@ def test_path_to_url(tmp_path) -> None:
     assert url.endswith("doc.docx")
 
 
-def test_make_props_builds_property_values() -> None:
-    prop_type = _install_fake_property_value()
+def test_make_props_builds_property_values(fake_property_value) -> None:
     props = _make_props(FilterName="writer8", Hidden=True)
     assert len(props) == 2
-    assert isinstance(props[0], prop_type)
+    assert isinstance(props[0], fake_property_value)
     names = {p.Name: p.Value for p in props}
     assert names == {"FilterName": "writer8", "Hidden": True}
 
@@ -125,7 +163,7 @@ class FakeEnum:
 class FakeParagraphElement:
     def __init__(self, text: str, style: str, outline_level: int) -> None:
         self.String = text
-        self.ParagraphStyleName = style
+        self.ParaStyleName = style
         self.OutlineLevel = outline_level
 
     def supportsService(self, service: str) -> bool:
@@ -155,18 +193,18 @@ class FakeDocWithOutline:
 def test_get_outline_reports_char_offsets() -> None:
     content = "Intro paragraph\nChapter One\nBody text\nChapter Two\nMore body\n"
     paragraphs = [
-        FakeParagraphElement("Intro paragraph\n", "Text Body", 0),
-        FakeParagraphElement("Chapter One\n", "Heading 1", 1),
-        FakeParagraphElement("Body text\n", "Text Body", 0),
-        FakeParagraphElement("Chapter Two\n", "Heading 2", 2),
-        FakeParagraphElement("More body\n", "Text Body", 0),
+        FakeParagraphElement("Intro paragraph", "Text Body", 0),
+        FakeParagraphElement("Chapter One", "Heading 1", 1),
+        FakeParagraphElement("Body text", "Text Body", 0),
+        FakeParagraphElement("Chapter Two", "Heading 2", 2),
+        FakeParagraphElement("More body", "Text Body", 0),
     ]
     outline = Document(FakeDocWithOutline(content, paragraphs)).get_outline()
     assert [heading["text"] for heading in outline] == [
-        "Chapter One\n",
-        "Chapter Two\n",
+        "Chapter One",
+        "Chapter Two",
     ]
     assert [heading["level"] for heading in outline] == [1, 2]
     assert [heading["start"] for heading in outline] == [16, 38]
-    assert [heading["end"] for heading in outline] == [28, 50]
-    assert outline[0]["start"] == content.index("Chapter One\n")
+    assert [heading["end"] for heading in outline] == [27, 49]
+    assert outline[0]["start"] == content.index("Chapter One")
