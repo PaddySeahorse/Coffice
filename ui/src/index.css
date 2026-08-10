@@ -120,9 +120,6 @@ input {
   display: none;
 }
 
-.sidebar--collapsed .sidebar-content {
-  display: none;
-}
 
 .sidebar-content {
   flex: 1;
