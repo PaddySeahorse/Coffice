@@ -159,10 +159,18 @@ def test_real_import_roundtrip_preserves_history(client: CoClient, tmp_path: Pat
     assert len(client.log(str(fresh))) == before
 
 
-def test_real_branch_unsupported(client: CoClient, tmp_path: Path) -> None:
-    """Upstream co does not implement branch/merge/tag -> typed error."""
+def test_real_branch(client: CoClient, tmp_path: Path) -> None:
+    """Upstream co now supports branch natively."""
+    doc = make_docx(tmp_path / "report.docx")
+    client.init(str(doc))
+    h = client.commit(str(doc), "base", author="AI-Writer")
+    result = client.branch(str(doc), "feature")
+    assert result.name == "feature"
+    assert result.hash == h
+
+
+def test_real_merge_tag_unsupported(client: CoClient, tmp_path: Path) -> None:
+    """Upstream co does not implement merge/tag -> typed error."""
     doc = make_docx(tmp_path / "report.docx")
     client.init(str(doc))
     client.commit(str(doc), "m", author="AI-Writer")
-    with pytest.raises(CoUnsupportedError, match="branch"):
-        client.branch(str(doc), "feature")
