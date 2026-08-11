@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "coffice"
-version = "0.2.1"
+version = "0.3.0"
 description = "AI-first office suite: LibreOffice rendering core with an MCP bridge for LLM agents"
 readme = "README.md"
 requires-python = ">=3.11"

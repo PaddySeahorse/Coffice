@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v0.3.0 (2026-08-11)
+
+### Bug Fixes
+
+- **sidebar**: Use git-compare icon for diff
+  ([`6c2dc7f`](https://github.com/PaddySeahorse/Coffice/commit/6c2dc7f742ff50f9a3a4bf97c2ed493e40a1b66d))
+
+### Features
+
+- Update UI sidebar collapse behavior and upgrade icons to SVGs
+  ([`712b756`](https://github.com/PaddySeahorse/Coffice/commit/712b756f258e7ef017eb62f6084d1f2ba6cb87a3))
+
+- Update UI sidebar collapse behavior and upgrade icons to SVGs
+  ([`5961e0b`](https://github.com/PaddySeahorse/Coffice/commit/5961e0b0f4d666bd074b51958d5de49f2b01083b))
+
+
 ## v0.2.1 (2026-08-09)
 
 ### Bug Fixes
