@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v0.3.1 (2026-08-11)
+
+### Bug Fixes
+
+- **co-client**: Keep unsupported error details
+  ([`76d6d7c`](https://github.com/PaddySeahorse/Coffice/commit/76d6d7c017700f71250d71725f889c9b38edde3b))
+
+- **versioning**: Pass --status flag to co diff
+  ([`5405e3a`](https://github.com/PaddySeahorse/Coffice/commit/5405e3a5eb30432d432d83e9b38550e9bec8df71))
+
+
 ## v0.3.0 (2026-08-11)
 
 ### Bug Fixes
