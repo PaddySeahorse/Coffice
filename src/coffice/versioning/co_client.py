@@ -549,7 +549,7 @@ class CoClient:
 
     def diff(self, path: str, h1: str, h2: str, bundle: str | None = None) -> list[DiffEntry]:
         """Compare two commits; returns changed zip-internal paths (A/D/M)."""
-        args = [h1, h2, path]
+        args = [h1, h2, "--status", path]
         if bundle:
             args += ["--external", bundle]
         proc = self._run("diff", args)
