@@ -15,7 +15,6 @@ import pytest
 
 from coffice.versioning import (
     INCLUDE_CO_WARNING,
-    CoUnsupportedError,
     co_available,
     resolve_bin_path,
 )
