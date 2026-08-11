@@ -109,7 +109,7 @@ class CoUnsupportedError(CoError):
         msg = f"co does not support the '{command}' command."
         if supported:
             msg += f" Supported commands: {', '.join(sorted(supported))}."
-        msg = (
+        msg += (
             " The upstream co CLI (https://github.com/PaddySeahorse/co) "
             "does not implement merge/tag."
         )
