@@ -111,7 +111,7 @@ class CoUnsupportedError(CoError):
             msg += f" Supported commands: {', '.join(sorted(supported))}."
         msg = (
             " The upstream co CLI (https://github.com/PaddySeahorse/co) "
-            "does not implement branch/merge/tag."
+            "does not implement merge/tag."
         )
         super().__init__(msg)
 
@@ -336,7 +336,7 @@ def require_co(bin_path: str | None = None) -> str:
 _HASH_RE = re.compile(r"([0-9a-fA-F]{7,64})")
 _COMMIT_RE = re.compile(r"^Committed ([0-9a-fA-F]{7,64})")
 _CHECKOUT_RE = re.compile(r"^Checked out ([0-9a-fA-F]{7,64})")
-_BRANCH_RE = re.compile(r"^Created branch (\S+) at ([0-9a-fA-F]{7,64})")
+_BRANCH_RE = re.compile(r"^Created branch (\S+)")
 _TAG_RE = re.compile(r"^Created tag (\S+) at ([0-9a-fA-F]{7,64})")
 _MERGE_HASH_RE = re.compile(r"commit:?\s+([0-9a-fA-F]{7,64})")
 _LOG_COMMIT_RE = re.compile(r"^commit ([0-9a-fA-F]{7,64})\s*$")
@@ -563,14 +563,21 @@ class CoClient:
         return entries
 
     def branch(self, path: str, name: str) -> BranchResult:
-        """Create a branch. Unsupported by the upstream binary."""
-        self._require_command("branch")
-        args = [path, name]
+        """Create a branch."""
+        args = [name, path]
         proc = self._run("branch", args)
         match = _BRANCH_RE.search(proc.stdout or "")
         if not match:
             raise CoCommandError("branch", args, 0, proc.stdout, proc.stderr, "unexpected output")
-        return BranchResult(name=match.group(1), hash=match.group(2))
+
+        # Fetch the head commit hash (co branch output does not include it)
+        try:
+            commits = self.log(path, limit=1)
+            hash_ = commits[0].hash if commits else ""
+        except CoError:
+            hash_ = ""
+
+        return BranchResult(name=match.group(1), hash=hash_)
 
     def merge(self, path: str, branch: str) -> MergeResult:
         """Merge a branch into the current one. Unsupported upstream."""

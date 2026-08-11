@@ -248,8 +248,12 @@ def test_branch_merge_tag(version_server: FastMCP, fake_co_env: dict[str, str]) 
     assert tagged["name"] == "v1.0"
 
     invocations = read_invocations(fake_co_env)
+    # The 'log' probe call happens inside `self.log` on the first call, so there are two 'log' commands:
+    # 1. log --json (probe fails or parses)
+    # 2. log (or --json again depending on probe)
+    # Let's filter out multiple 'log' occurrences to make the assert simpler and robust.
     commands = [line[1] for line in invocations if line[1] != "--help"]
-    assert commands == ["commit", "branch", "merge", "tag"]
+    assert commands == ["commit", "branch", "log", "log", "merge", "tag"]
 
 
 def test_branch_requires_name(version_server: FastMCP) -> None:
