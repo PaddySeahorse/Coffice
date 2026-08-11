@@ -89,9 +89,9 @@ def usage():
         "  export <path>                Extract .co/ history into a standalone .co-bundle",
         "  import <path> <bundle>       Inject a .co-bundle's history back into an Office file",
         "  migrate <path>               Convert the repository's hash algorithm (sha1<->sha256)",
+        "  branch <name> <path>         Create a branch pointing at the current HEAD",
     ]
     if not NO_BRANCH:
-        lines.append("  branch <path> <name>          Create a new branch (emulated by fake co)")
         lines.append("  merge <path> <branch>         Merge a branch (emulated by fake co)")
         lines.append("  tag <path> <name>             Create a tag (emulated by fake co)")
     return "\n".join(lines)
@@ -254,12 +254,12 @@ def cmd_import(args):
 
 
 def cmd_branch(args):
-    path, name = args[0], args[1]
+    name, path = args[0], args[1]
     state = load_state()
     ds = doc_state(state, path)
     ds["branches"][name] = ds["head"]
     save_state(state)
-    print(f"Created branch {name} at {ds['head']}")
+    print(f"Created branch {name}")
 
 
 def cmd_merge(args):
@@ -341,7 +341,9 @@ def main():
         "gc": cmd_gc,
     }
     if not NO_BRANCH:
-        handlers.update({"branch": cmd_branch, "merge": cmd_merge, "tag": cmd_tag})
+        handlers.update({"merge": cmd_merge, "tag": cmd_tag})
+    handlers["branch"] = cmd_branch
+
     if cmd not in handlers:
         # Real co prints usage to stdout and exits 1 for unknown commands.
         print(usage())

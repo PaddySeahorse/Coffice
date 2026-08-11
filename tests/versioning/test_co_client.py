@@ -86,6 +86,7 @@ def test_require_co_missing_mentions_install(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.delenv("CO_BIN", raising=False)
     monkeypatch.delenv("COFFICE_CO_BIN", raising=False)
     monkeypatch.setattr("shutil.which", lambda _: None)
+    monkeypatch.setattr("os.path.isfile", lambda _: False)
     with pytest.raises(CoNotAvailableError, match="install_co.sh"):
         require_co(bin_path=None)
 
@@ -246,15 +247,13 @@ def test_tag(client: CoClient, tmp_path: Path) -> None:
     assert result.hash == h
 
 
-def test_branch_unsupported_when_not_advertised(tmp_path: Path) -> None:
-    """branch/merge/tag raise CoUnsupportedError when the binary omits them."""
+def test_merge_tag_unsupported_when_not_advertised(tmp_path: Path) -> None:
+    """merge/tag raise CoUnsupportedError when the binary omits them."""
     client = CoClient(
         bin_path=str(FAKE_CO),
         env={"FAKE_CO_NO_BRANCH": "1", "FAKE_CO_STATE": str(tmp_path / "state.json")},
     )
     doc = make_docx(tmp_path / "doc.docx")
-    with pytest.raises(CoUnsupportedError, match="branch"):
-        client.branch(str(doc), "feature")
     with pytest.raises(CoUnsupportedError, match="merge"):
         client.merge(str(doc), "feature")
     with pytest.raises(CoUnsupportedError, match="tag"):
