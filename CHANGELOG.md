@@ -2,6 +2,21 @@
 
 <!-- version list -->
 
+## v0.5.0 (2026-08-13)
+
+### Features
+
+- Add light and dark mode toggle in WebUI
+  ([`5f06669`](https://github.com/PaddySeahorse/Coffice/commit/5f066698f885f7cc30ca3aafa8049c80237b2bbf))
+
+- Web Design Guidelines ([#25](https://github.com/PaddySeahorse/Coffice/pull/25),
+  [`93e5df0`](https://github.com/PaddySeahorse/Coffice/commit/93e5df0dffc2ae47d6d3a02a857cee83127f5092))
+
+- **ui**: Translate web UI from Chinese to English
+  ([#24](https://github.com/PaddySeahorse/Coffice/pull/24),
+  [`19d8fe2`](https://github.com/PaddySeahorse/Coffice/commit/19d8fe2fefb249fb83ec80155cf77ab40fb43678))
+
+
 ## v0.4.0 (2026-08-13)
 
 ### Bug Fixes
