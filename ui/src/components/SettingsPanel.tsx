@@ -77,7 +77,7 @@ export function SettingsPanel({ onNotify }: SettingsPanelProps) {
       );
       onNotify(
         result.ok ? "success" : "error",
-        result.ok ? "LLM connection successful" : (result.error ?? "LLM Connection failed"),
+        result.ok ? "LLM connection successful" : (result.error ?? "LLM connection failed"),
       );
     } finally {
       setBusy(false);
