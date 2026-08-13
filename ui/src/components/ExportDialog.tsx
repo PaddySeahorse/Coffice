@@ -63,9 +63,9 @@ export function ExportDialog({ open, onClose, onExport }: ExportDialogProps) {
   };
 
   return (
-    <div className="modal-overlay" data-testid="export-dialog" role="dialog" aria-modal="true">
+    <div className="modal-overlay" data-testid="export-dialog" role="dialog" aria-modal="true" aria-labelledby="export-dialog-title">
       <div className="modal">
-        <h2 className="modal-title">Export Document</h2>
+        <h2 className="modal-title" id="export-dialog-title">Export Document</h2>
         <label className="checkbox-row" data-testid="checkbox-include-co">
           <input
             type="checkbox"
@@ -110,6 +110,8 @@ export function ExportDialog({ open, onClose, onExport }: ExportDialogProps) {
                   href={`${getApiConfig().agentBaseUrl}download?path=${encodeURIComponent(state.lastResult.path)}`}
                   className="btn btn--primary"
                   data-testid="link-download"
+                  target="_blank"
+                  rel="noopener noreferrer"
                 >
                   Click to download
                 </a>
@@ -128,7 +130,7 @@ export function ExportDialog({ open, onClose, onExport }: ExportDialogProps) {
             disabled={state.exporting}
             onClick={() => void exportAction()}
           >
-            {state.exporting ? "Exporting..." : "Export"}
+            {state.exporting ? "Exporting…" : "Export"}
           </button>
           <button
             type="button"

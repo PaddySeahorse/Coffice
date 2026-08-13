@@ -85,6 +85,7 @@ export function Sidebar({
             className={`rail-item${activeSection === section.id ? " rail-item--active" : ""}`}
             onClick={() => onSelectSection(section.id)}
             aria-label={section.label}
+            aria-current={activeSection === section.id ? "page" : undefined}
             title={section.label}
             data-testid={`rail-${section.id}`}
           >
@@ -137,7 +138,7 @@ export function Sidebar({
           {!collapsed && <span className="rail-label">Commands</span>}
         </button>
       </nav>
-      <div className="sidebar-content">{children}</div>
+      {children}
     </div>
   );
 }

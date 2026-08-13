@@ -26,7 +26,7 @@ export function ChatPanel({ messages, busy, onSend, onConfirm }: ChatPanelProps)
 
   return (
     <section className="panel chat-panel" data-testid="chat-panel">
-      <div className="panel-scroll">
+      <div className="panel-scroll" role="log" aria-live="polite" aria-label="Chat transcript">
         {messages.length === 0 ? (
           <p className="empty-hint">
             Send a message to the AI to start collaborating. The AI will read the document and call tools to make modifications.
@@ -77,18 +77,21 @@ export function ChatPanel({ messages, busy, onSend, onConfirm }: ChatPanelProps)
           ))
         )}
         {busy && (
-          <p className="chat-typing" data-testid="chat-typing">
-            Agent is processing...
+          <p className="chat-typing" data-testid="chat-typing" aria-live="polite">
+            Agent is processing…
           </p>
         )}
       </div>
       <form className="chat-composer" onSubmit={submit}>
         <input
           type="text"
+          name="chat-message"
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
-          placeholder="Enter instructions, e.g., add a summary paragraph at the end of the document"
+          placeholder="Enter instructions, e.g., add a summary paragraph at the end of the document…"
           aria-label="Message Input"
+          autoComplete="off"
+          spellCheck={false}
           disabled={busy}
         />
         <button type="submit" className="btn btn--primary" disabled={busy || !draft.trim()}>

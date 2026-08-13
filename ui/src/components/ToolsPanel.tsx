@@ -46,6 +46,7 @@ export function ToolsPanel({ tools, onRunTool }: ToolsPanelProps) {
   return (
     <section className="panel" data-testid="tools-panel">
       <div className="panel-scroll">
+        <h3 className="section-title">MCP Tools</h3>
         <p className="panel-hint">{tools.length} registered tools (MCP introspection)</p>
         <ul className="tool-list">
           {tools.map((tool) => {
@@ -62,7 +63,7 @@ export function ToolsPanel({ tools, onRunTool }: ToolsPanelProps) {
                       disabled={runState?.running}
                       onClick={() => void run(tool)}
                     >
-                      {runState?.name === tool.name && runState.running ? "Running..." : "Run"}
+                      {runState?.name === tool.name && runState.running ? "Running…" : "Run"}
                     </button>
                   )}
                 </div>

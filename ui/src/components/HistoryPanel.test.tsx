@@ -44,9 +44,11 @@ describe("HistoryPanel", () => {
     render(
       <HistoryPanel commits={COMMITS} busy={false} onRollback={onRollback} onPreview={vi.fn()} />,
     );
-    // the rollback button lives in the expanded detail row
+    // the rollback button lives in the expanded detail row and uses a two-step confirm
     await user.click(screen.getByTestId("history-9f3a1c7"));
-    await user.click(screen.getByTestId("rollback-9f3a1c7"));
+    const rollback = screen.getByTestId("rollback-9f3a1c7");
+    await user.click(rollback); // arms the confirm
+    await user.click(rollback); // confirms
     expect(onRollback).toHaveBeenCalledTimes(1);
     expect(onRollback).toHaveBeenCalledWith("9f3a1c7e");
   });

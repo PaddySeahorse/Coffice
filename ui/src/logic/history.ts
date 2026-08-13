@@ -8,6 +8,14 @@ export function shortHash(hash: string): string {
   return hash.length > 7 ? hash.slice(0, 7) : hash;
 }
 
+const TIMESTAMP_FORMAT = new Intl.DateTimeFormat(undefined, {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+
 /** Format an ISO-8601 timestamp for display (fallback: raw string). */
 export function formatTimestamp(timestamp: string | null): string {
   if (!timestamp) return "";
@@ -15,7 +23,7 @@ export function formatTimestamp(timestamp: string | null): string {
   if (Number.isNaN(date.getTime())) {
     return timestamp;
   }
-  return date.toLocaleString();
+  return TIMESTAMP_FORMAT.format(date);
 }
 
 /** "abc1234 · John Doe" — compact one-line commit identity. */
