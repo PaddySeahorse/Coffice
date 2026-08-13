@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v0.4.0 (2026-08-13)
+
+### Bug Fixes
+
+- **sidebar**: Clean up temp bundle on export error
+  ([`98d112b`](https://github.com/PaddySeahorse/Coffice/commit/98d112b0e4011bbd769ce2dbed09b56a39dcb2f9))
+
+### Features
+
+- **sidebar**: Preserve .co history on save
+  ([`baa6b8d`](https://github.com/PaddySeahorse/Coffice/commit/baa6b8d4f39e41cba3859348a8082a007a7e4055))
+
+
 ## v0.3.1 (2026-08-11)
 
 ### Bug Fixes
