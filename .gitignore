@@ -26,6 +26,7 @@ ui/node_modules/
 extension/icons/coffice.png
 extension/python/coffice/contract.py
 extension/python/coffice/doc_commands.py
+extension/python/coffice/co_save.py
 
 # Environment
 .env
