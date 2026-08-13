@@ -68,6 +68,11 @@ interface Banner {
 export default function App() {
   const [activeSection, setActiveSection] = useState<SectionId>("chat");
   const [collapsed, setCollapsed] = useState(false);
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    const stored = localStorage.getItem("theme");
+    if (stored === "light" || stored === "dark") return stored;
+    return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  });
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [agentStatus, setAgentStatus] = useState<AgentStatus>("idle");
@@ -90,6 +95,12 @@ export default function App() {
     const commits = await fetchHistory();
     setHistory(commits);
   }, []);
+
+  // Theme sync
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("theme", theme);
+  }, [theme]);
 
   // Initial load: tools introspection + co log timeline (mock fallback).
   useEffect(() => {
@@ -517,6 +528,8 @@ export default function App() {
         collapsed={collapsed}
         onSelectSection={setActiveSection}
         onToggleCollapsed={() => setCollapsed((value) => !value)}
+        theme={theme}
+        onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
         onOpenExport={() => setExportOpen(true)}
         onOpenPalette={() => setPaletteOpen(true)}
       >
