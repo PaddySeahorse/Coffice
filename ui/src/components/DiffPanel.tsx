@@ -14,8 +14,12 @@ interface DiffPanelProps {
   busy: boolean;
 }
 
+function changeKey(change: AppliedToolCall, index: number): string {
+  return `${change.tool}-${JSON.stringify(change.arguments)}-${index}`;
+}
+
 export function DiffPanel({ changes, sessionId, onAccept, onReject, busy }: DiffPanelProps) {
-  const [expanded, setExpanded] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   return (
     <section className="panel" data-testid="diff-panel">
@@ -28,22 +32,25 @@ export function DiffPanel({ changes, sessionId, onAccept, onReject, busy }: Diff
         ) : (
           <ul className="change-list">
             {changes.map((change, index) => {
-              const isOpen = expanded === index;
+              const key = changeKey(change, index);
+              const isOpen = expanded === key;
               const summary = summarizeToolCall(change);
+              const detailId = `change-detail-${index}`;
               return (
-                <li key={`${change.tool}-${index}`} className="change-item">
+                <li key={key} className="change-item">
                   <button
                     type="button"
                     className="change-item__summary"
-                    onClick={() => setExpanded(isOpen ? null : index)}
+                    onClick={() => setExpanded(isOpen ? null : key)}
                     aria-expanded={isOpen}
+                    aria-controls={detailId}
                   >
                     <span className="change-tool">{change.tool}</span>
                     <span className="change-summary-text">{summary}</span>
                     <span className="change-caret" aria-hidden="true">{isOpen ? "▾" : "▸"}</span>
                   </button>
                   {isOpen && (
-                    <div className="change-item__detail">
+                    <div className="change-item__detail" id={detailId}>
                       <pre className="change-detail">{toolCallDetail(change)}</pre>
                       <div className="change-actions">
                         <button

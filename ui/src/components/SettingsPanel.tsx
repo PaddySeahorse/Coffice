@@ -3,7 +3,7 @@
 // to the in-process LLMClient and persisted by POST /settings; the test button
 // pings the candidate endpoint before committing to it.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fetchSettings, saveSettings, testSettings } from "../api/settingsApi";
 import type { LlmSettings } from "../types";
 
@@ -20,6 +20,8 @@ export function SettingsPanel({ onNotify }: SettingsPanelProps) {
   const [apiKeySet, setApiKeySet] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
+  const baseUrlRef = useRef<HTMLInputElement>(null);
+  const modelRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -42,7 +44,11 @@ export function SettingsPanel({ onNotify }: SettingsPanelProps) {
 
   const handleSave = async () => {
     if (!baseUrl.trim() || !model.trim()) {
-      setNotice({ kind: "error", text: "Base URL and Model cannot be empty" });
+      setNotice({
+        kind: "error",
+        text: "Base URL and Model cannot be empty — enter both, then Save.",
+      });
+      focusFirstInvalid();
       return;
     }
     setBusy(true);
@@ -61,9 +67,18 @@ export function SettingsPanel({ onNotify }: SettingsPanelProps) {
     }
   };
 
+  const focusFirstInvalid = () => {
+    if (!baseUrl.trim()) baseUrlRef.current?.focus();
+    else if (!model.trim()) modelRef.current?.focus();
+  };
+
   const handleTest = async () => {
     if (!baseUrl.trim() || !model.trim()) {
-      setNotice({ kind: "error", text: "Base URL and Model cannot be empty" });
+      setNotice({
+        kind: "error",
+        text: "Base URL and Model cannot be empty — enter both, then Test Connection.",
+      });
+      focusFirstInvalid();
       return;
     }
     setBusy(true);
@@ -95,10 +110,14 @@ export function SettingsPanel({ onNotify }: SettingsPanelProps) {
         <label className="settings-field" data-testid="field-base-url">
           <span className="settings-label">Base URL</span>
           <input
-            type="text"
+            ref={baseUrlRef}
+            type="url"
+            inputMode="url"
+            name="base-url"
             value={baseUrl}
             onChange={(event) => setBaseUrl(event.target.value)}
             placeholder="http://127.0.0.1:11434/v1"
+            autoComplete="url"
             spellCheck={false}
             data-testid="input-base-url"
           />
@@ -107,10 +126,13 @@ export function SettingsPanel({ onNotify }: SettingsPanelProps) {
         <label className="settings-field" data-testid="field-model">
           <span className="settings-label">Model</span>
           <input
+            ref={modelRef}
             type="text"
+            name="model"
             value={model}
             onChange={(event) => setModel(event.target.value)}
             placeholder="qwen2.5:7b"
+            autoComplete="off"
             spellCheck={false}
             data-testid="input-model"
           />
@@ -120,18 +142,25 @@ export function SettingsPanel({ onNotify }: SettingsPanelProps) {
           <span className="settings-label">API Key</span>
           <input
             type="password"
+            name="api-key"
             value={apiKey}
             onChange={(event) => setApiKey(event.target.value)}
             placeholder={
               apiKeySet ? "Set, leave blank to keep unchanged" : "Optional (can be blank for local services)"
             }
             autoComplete="off"
+            spellCheck={false}
             data-testid="input-api-key"
           />
         </label>
 
         {notice && (
-          <p className={`settings-notice settings-notice--${notice.kind}`} data-testid="settings-notice">
+          <p
+            className={`settings-notice settings-notice--${notice.kind}`}
+            data-testid="settings-notice"
+            role="status"
+            aria-live="polite"
+          >
             {notice.text}
           </p>
         )}
@@ -144,7 +173,7 @@ export function SettingsPanel({ onNotify }: SettingsPanelProps) {
             disabled={busy}
             onClick={() => void handleTest()}
           >
-            {busy ? "Testing..." : "Test Connection"}
+            {busy ? "Testing…" : "Test Connection"}
           </button>
           <button
             type="button"
