@@ -523,6 +523,10 @@ export default function App() {
 
   return (
     <div className="app" data-testid="app">
+      <a href="#main" className="skip-link">
+        Skip to main content
+      </a>
+      <h1 className="sr-only">Coffice Agent Deck</h1>
       <Sidebar
         activeSection={activeSection}
         collapsed={collapsed}
@@ -533,7 +537,9 @@ export default function App() {
         onOpenExport={() => setExportOpen(true)}
         onOpenPalette={() => setPaletteOpen(true)}
       >
-        {sectionPanel}
+        <main id="main" tabIndex={-1} className="sidebar-content">
+          {sectionPanel}
+        </main>
       </Sidebar>
       <StatusBar agentStatus={agentStatus} commitCount={history.length} />
       {banner && (
