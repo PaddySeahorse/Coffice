@@ -114,7 +114,11 @@ def backup_history(path: str, bin_path: str | None = None) -> str | None:
     bundle = Path(tmp)
     binary = bin_path or find_co_binary()
     if binary is not None:
-        proc = _run(binary, ["export", str(src), "--output", str(bundle)])
+        try:
+            proc = _run(binary, ["export", str(src), "--output", str(bundle)])
+        except CoSaveError:
+            bundle.unlink(missing_ok=True)
+            raise
         if proc.returncode != 0:
             bundle.unlink(missing_ok=True)
             raise CoSaveError(
