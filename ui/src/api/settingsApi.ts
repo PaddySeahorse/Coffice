@@ -30,7 +30,7 @@ export function probeErrorMessage(err: unknown): string {
     "name" in err &&
     (err as { name?: unknown }).name === "AbortError"
   ) {
-    return "连接测试超时：25 秒内未收到响应，请检查 Base URL 是否可达";
+    return "Connection test timed out: No response received within 25 seconds, please check if the Base URL is reachable";
   }
   return err instanceof Error ? err.message : String(err);
 }

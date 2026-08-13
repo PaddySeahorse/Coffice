@@ -16,7 +16,7 @@ describe("summarizeToolCall", () => {
   it('renders "insertText → N paragraphs"', () => {
     const change: AppliedToolCall = {
       tool: "insertText",
-      arguments: { pos: "end", text: "第一段。\n第二段。" },
+      arguments: { pos: "end", text: "First paragraph.\nSecond paragraph." },
       result: { ok: true },
       ok: true,
     };
@@ -30,7 +30,7 @@ describe("summarizeToolCall", () => {
       result: { ok: false, error: "boom" },
       ok: false,
     };
-    expect(summarizeToolCall(change)).toBe("insertText → 失败");
+    expect(summarizeToolCall(change)).toBe("insertText → failed");
   });
 
   it("summarizes other tools without crashing", () => {

@@ -46,7 +46,7 @@ export function ToolsPanel({ tools, onRunTool }: ToolsPanelProps) {
   return (
     <section className="panel" data-testid="tools-panel">
       <div className="panel-scroll">
-        <p className="panel-hint">{tools.length} 个已注册工具（MCP 内省）</p>
+        <p className="panel-hint">{tools.length} registered tools (MCP introspection)</p>
         <ul className="tool-list">
           {tools.map((tool) => {
             const isRead = READ_TOOL_NAMES.has(tool.name);
@@ -62,7 +62,7 @@ export function ToolsPanel({ tools, onRunTool }: ToolsPanelProps) {
                       disabled={runState?.running}
                       onClick={() => void run(tool)}
                     >
-                      {runState?.name === tool.name && runState.running ? "运行中…" : "运行"}
+                      {runState?.name === tool.name && runState.running ? "Running..." : "Run"}
                     </button>
                   )}
                 </div>

@@ -140,7 +140,7 @@ export async function exportDoc(params: ExportParams): Promise<ExportResult> {
       packagePath: params.package ? "/tmp/report-export.docx.coffice.zip" : null,
       includeCo: params.includeCo,
       warning: params.includeCo
-        ? "勾选后若使用 Microsoft Word 或 WPS 打开此文件，版本历史将会丢失"
+        ? "If checked, version history will be lost when opening this file in Microsoft Word or WPS"
         : "",
       warnings: [],
     };

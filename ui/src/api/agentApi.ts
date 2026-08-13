@@ -135,7 +135,7 @@ export async function sendChatStream(
           round_id: null,
           needs_confirmation: false,
           confirmation: null,
-          error: String(event.data.error ?? "agent 处理出错"),
+          error: String(event.data.error ?? "agent processing error"),
           session_id:
             event.data.session_id != null ? String(event.data.session_id) : undefined,
         };
@@ -225,7 +225,7 @@ export async function sendConfirmationStream(
           round_id: null,
           needs_confirmation: false,
           confirmation: null,
-          error: String(event.data.error ?? "确认操作失败"),
+          error: String(event.data.error ?? "Confirmation operation failed"),
           session_id:
             event.data.session_id != null ? String(event.data.session_id) : undefined,
         };
@@ -240,8 +240,8 @@ export async function sendConfirmationStream(
       status: "complete",
       reply:
         request.action === "confirm"
-          ? "已确认该改动并继续执行。"
-          : "已拒绝该改动，文档已回滚到操作前状态。",
+          ? "Change confirmed and execution continues."
+          : "Change rejected, document reverted to pre-operation state.",
       change_summary: [],
       round_id: "mock-round",
       needs_confirmation: false,
@@ -280,8 +280,8 @@ export async function sendConfirmation(
       status: "complete",
       reply:
         request.action === "confirm"
-          ? "已确认该改动并继续执行。"
-          : "已拒绝该改动，文档已回滚到操作前状态。",
+          ? "Change confirmed and execution continues."
+          : "Change rejected, document reverted to pre-operation state.",
       change_summary: [],
       round_id: "mock-round",
       needs_confirmation: false,

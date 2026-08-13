@@ -23,7 +23,7 @@ export function summarizeToolCall(change: AppliedToolCall): string {
   const args = change.arguments ?? {};
   const tool = change.tool || "tool";
   if (!change.ok) {
-    return `${tool} → 失败`;
+    return `${tool} → failed`;
   }
   switch (tool) {
     case "insertText": {

@@ -1,6 +1,6 @@
-// Export dialog (planning doc 14.6): checkbox "包含版本历史 (.co/)" with the
-// mandatory warning text when checked, checkbox "同时导出 .co-bundle" (default
-// on), optional .coffice.zip packaging, and [导出]/[取消] buttons. Wired to
+// Export dialog (planning doc 14.6): checkbox "Include version history (.co/)" with the
+// mandatory warning text when checked, checkbox "Also export .co-bundle" (default
+// on), optional .coffice.zip packaging, and [Export]/[Cancel] buttons. Wired to
 // the exportDoc tool through the agent facade.
 
 import { useEffect, useReducer } from "react";
@@ -52,7 +52,7 @@ export function ExportDialog({ open, onClose, onExport }: ExportDialogProps) {
       if (result.ok) {
         dispatch({ type: "succeeded", result });
       } else {
-        dispatch({ type: "failed", error: result.error ?? "导出失败" });
+        dispatch({ type: "failed", error: result.error ?? "Export failed" });
       }
     } catch (error) {
       dispatch({
@@ -65,14 +65,14 @@ export function ExportDialog({ open, onClose, onExport }: ExportDialogProps) {
   return (
     <div className="modal-overlay" data-testid="export-dialog" role="dialog" aria-modal="true">
       <div className="modal">
-        <h2 className="modal-title">导出文档</h2>
+        <h2 className="modal-title">Export Document</h2>
         <label className="checkbox-row" data-testid="checkbox-include-co">
           <input
             type="checkbox"
             checked={state.includeCo}
             onChange={() => dispatch({ type: "toggle", field: "includeCo" })}
           />
-          <span>包含版本历史 (.co/)</span>
+          <span>Include version history (.co/)</span>
         </label>
         {warnings.map((warning) => (
           <p key={warning} className="export-warning" data-testid="export-warning">
@@ -85,7 +85,7 @@ export function ExportDialog({ open, onClose, onExport }: ExportDialogProps) {
             checked={state.includeBundle}
             onChange={() => dispatch({ type: "toggle", field: "includeBundle" })}
           />
-          <span>同时导出 .co-bundle</span>
+          <span>Also export .co-bundle</span>
         </label>
         <label className="checkbox-row" data-testid="checkbox-package">
           <input
@@ -93,7 +93,7 @@ export function ExportDialog({ open, onClose, onExport }: ExportDialogProps) {
             checked={state.packageZip}
             onChange={() => dispatch({ type: "toggle", field: "packageZip" })}
           />
-          <span>打包为 .coffice.zip</span>
+          <span>Package as .coffice.zip</span>
         </label>
 
         {state.error && (
@@ -103,7 +103,7 @@ export function ExportDialog({ open, onClose, onExport }: ExportDialogProps) {
         )}
         {state.done && state.lastResult && (
           <div className="export-result" data-testid="export-result">
-            <p>导出成功：{state.lastResult.path}</p>
+            <p>Export successful: {state.lastResult.path}</p>
             {state.lastResult.path && (
               <p>
                 <a
@@ -111,12 +111,12 @@ export function ExportDialog({ open, onClose, onExport }: ExportDialogProps) {
                   className="btn btn--primary"
                   data-testid="link-download"
                 >
-                  点击下载
+                  Click to download
                 </a>
               </p>
             )}
-            {state.lastResult.bundlePath && <p>版本历史：{state.lastResult.bundlePath}</p>}
-            {state.lastResult.packagePath && <p>打包：{state.lastResult.packagePath}</p>}
+            {state.lastResult.bundlePath && <p>Version History: {state.lastResult.bundlePath}</p>}
+            {state.lastResult.packagePath && <p>Package: {state.lastResult.packagePath}</p>}
           </div>
         )}
 
@@ -128,7 +128,7 @@ export function ExportDialog({ open, onClose, onExport }: ExportDialogProps) {
             disabled={state.exporting}
             onClick={() => void exportAction()}
           >
-            {state.exporting ? "导出中…" : "导出"}
+            {state.exporting ? "Exporting..." : "Export"}
           </button>
           <button
             type="button"
@@ -140,7 +140,7 @@ export function ExportDialog({ open, onClose, onExport }: ExportDialogProps) {
               onClose();
             }}
           >
-            取消
+            Cancel
           </button>
         </div>
       </div>

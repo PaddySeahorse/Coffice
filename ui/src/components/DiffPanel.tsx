@@ -20,10 +20,10 @@ export function DiffPanel({ changes, sessionId, onAccept, onReject, busy }: Diff
   return (
     <section className="panel" data-testid="diff-panel">
       <div className="panel-scroll">
-        <h3 className="section-title">会话改动（{changes.length}）</h3>
+        <h3 className="section-title">Session Changes ({changes.length})</h3>
         {changes.length === 0 ? (
           <p className="empty-hint">
-            暂无改动。在 Chat 面板向 AI 发送指令后，此处会显示本次会话的工具调用摘要。
+            No changes yet. Send instructions to the AI in the Chat panel to see tool call summaries here.
           </p>
         ) : (
           <ul className="change-list">
@@ -53,7 +53,7 @@ export function DiffPanel({ changes, sessionId, onAccept, onReject, busy }: Diff
                           disabled={busy}
                           onClick={() => onAccept(change)}
                         >
-                          接受
+                          Accept
                         </button>
                         <button
                           type="button"
@@ -62,11 +62,11 @@ export function DiffPanel({ changes, sessionId, onAccept, onReject, busy }: Diff
                           disabled={busy}
                           onClick={() => onReject(change)}
                         >
-                          拒绝
+                          Reject
                         </button>
                       </div>
                       {sessionId && (
-                        <p className="change-session">会话：{sessionId}</p>
+                        <p className="change-session">Session: {sessionId}</p>
                       )}
                     </div>
                   )}
