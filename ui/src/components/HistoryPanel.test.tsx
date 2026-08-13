@@ -17,9 +17,9 @@ const COMMITS: CommitInfo[] = [
   },
   {
     hash: "4d0b8a21",
-    author: "human:张三",
+    author: "human:John Doe",
     email: "zhangsan@example.com",
-    message: "撰写引言部分",
+    message: "Write the introduction section",
     timestamp: "2026-07-31T13:48:33+00:00",
   },
 ];
@@ -31,9 +31,9 @@ describe("HistoryPanel", () => {
     );
     // hashes are displayed short (7 chars): 9f3a1c7e -> 9f3a1c7
     expect(screen.getByText(/9f3a1c7 · AI-Writer/)).toBeInTheDocument();
-    expect(screen.getByText(/4d0b8a2 · human:张三/)).toBeInTheDocument();
+    expect(screen.getByText(/4d0b8a2 · human:John Doe/)).toBeInTheDocument();
     expect(screen.getByText("pre: round-7f3a9b2")).toBeInTheDocument();
-    expect(screen.getByText("撰写引言部分")).toBeInTheDocument();
+    expect(screen.getByText("Write the introduction section")).toBeInTheDocument();
     // timestamps are formatted, not raw ISO
     expect(screen.queryByText("2026-07-31T14:12:05+00:00")).not.toBeInTheDocument();
   });
@@ -55,7 +55,7 @@ describe("HistoryPanel", () => {
     render(
       <HistoryPanel commits={[]} busy={false} onRollback={vi.fn()} onPreview={vi.fn()} />,
     );
-    expect(screen.getByText(/暂无提交/)).toBeInTheDocument();
+    expect(screen.getByText(/No commits yet/)).toBeInTheDocument();
     expect(screen.queryAllByTestId(/^rollback-/)).toHaveLength(0);
   });
 

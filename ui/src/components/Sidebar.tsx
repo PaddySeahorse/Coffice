@@ -68,12 +68,12 @@ export function Sidebar({
 }: SidebarProps) {
   return (
     <div className={`sidebar${collapsed ? " sidebar--collapsed" : ""}`} data-testid="sidebar">
-      <nav className="sidebar-rail" aria-label="Agent Deck 分区">
+      <nav className="sidebar-rail" aria-label="Agent Deck Section">
         <button
           type="button"
           className="rail-toggle"
           onClick={onToggleCollapsed}
-          aria-label={collapsed ? "展开侧边栏" : "收起侧边栏"}
+          aria-label={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
           data-testid="rail-toggle"
         >
           {collapsed ? "»" : "«"}
@@ -97,8 +97,8 @@ export function Sidebar({
           type="button"
           className="rail-item"
           onClick={onToggleTheme}
-          aria-label="切换主题"
-          title={theme === "dark" ? "切换到浅色模式" : "切换到深色模式"}
+          aria-label="Toggle Theme"
+          title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
           data-testid="rail-theme"
         >
           <span className="rail-glyph" aria-hidden="true">
@@ -108,33 +108,33 @@ export function Sidebar({
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
             )}
           </span>
-          {!collapsed && <span className="rail-label">主题</span>}
+          {!collapsed && <span className="rail-label">Theme</span>}
         </button>
         <button
           type="button"
           className="rail-item"
           onClick={onOpenExport}
-          aria-label="导出"
-          title="导出文档"
+          aria-label="Export"
+          title="Export Document"
           data-testid="rail-export"
         >
           <span className="rail-glyph" aria-hidden="true">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
           </span>
-          {!collapsed && <span className="rail-label">导出</span>}
+          {!collapsed && <span className="rail-label">Export</span>}
         </button>
         <button
           type="button"
           className="rail-item"
           onClick={onOpenPalette}
-          aria-label="命令面板"
-          title="命令面板 (Cmd+K)"
+          aria-label="Command Palette"
+          title="Command Palette (Cmd+K)"
           data-testid="rail-palette"
         >
           <span className="rail-glyph" aria-hidden="true">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3"/></svg>
           </span>
-          {!collapsed && <span className="rail-label">命令</span>}
+          {!collapsed && <span className="rail-label">Commands</span>}
         </button>
       </nav>
       <div className="sidebar-content">{children}</div>

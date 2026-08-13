@@ -1,7 +1,7 @@
 // Acceptance-level render test: the Agent Deck renders the Chat / Context /
 // Tools / Diff / History sections plus the status bar with mock data, and the
 // Export dialog exposes the doc 14.6 checkboxes (bundle default-on, warning
-// on "包含版本历史").
+// on "Include version history").
 
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -21,9 +21,9 @@ const mocks = vi.hoisted(() => ({
     },
     {
       hash: "4d0b8a21",
-      author: "human:张三",
+      author: "human:John Doe",
       email: "zhangsan@example.com",
-      message: "撰写引言部分",
+      message: "Write the introduction section",
       timestamp: "2026-07-31T13:48:33+00:00",
     },
   ],
@@ -50,10 +50,10 @@ vi.mock("./api/agentApi", () => ({
       _operator: string | undefined,
       onEvent?: (event: { event: string; data: Record<string, unknown> }) => void,
     ) => {
-      onEvent?.({ event: "token", data: { text: "已完成。" } });
+      onEvent?.({ event: "token", data: { text: "Done." } });
       return {
         status: "complete",
-        reply: "已完成。",
+        reply: "Done.",
         change_summary: [],
         round_id: "r1",
         needs_confirmation: false,
@@ -68,10 +68,10 @@ vi.mock("./api/agentApi", () => ({
       _request: unknown,
       onEvent?: (event: { event: string; data: Record<string, unknown> }) => void,
     ) => {
-      onEvent?.({ event: "token", data: { text: "已确认。" } });
+      onEvent?.({ event: "token", data: { text: "Confirmed." } });
       return {
         status: "complete",
-        reply: "已确认。",
+        reply: "Confirmed.",
         change_summary: [],
         round_id: "r1",
         needs_confirmation: false,
@@ -83,7 +83,7 @@ vi.mock("./api/agentApi", () => ({
   ),
   sendChat: vi.fn(async () => ({
     status: "complete",
-    reply: "已完成。",
+    reply: "Done.",
     change_summary: [],
     round_id: "r1",
     needs_confirmation: false,
@@ -93,7 +93,7 @@ vi.mock("./api/agentApi", () => ({
   })),
   sendConfirmation: vi.fn(async () => ({
     status: "complete",
-    reply: "已确认。",
+    reply: "Confirmed.",
     change_summary: [],
     round_id: "r1",
     needs_confirmation: false,
@@ -162,7 +162,7 @@ describe("Agent Deck", () => {
 
     await user.click(screen.getByTestId("rail-settings"));
     expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
-    expect(screen.getByText("LLM 配置")).toBeInTheDocument();
+    expect(screen.getByText("LLM Configuration")).toBeInTheDocument();
   });
 
   it("switches between the Tools, Diff and History panels", async () => {
@@ -191,15 +191,15 @@ describe("Agent Deck", () => {
     const dialog = screen.getByTestId("export-dialog");
     expect(dialog).toBeInTheDocument();
     const bundleCheckbox = within(dialog).getByTestId("checkbox-include-bundle");
-    expect(bundleCheckbox).toHaveTextContent("同时导出 .co-bundle");
+    expect(bundleCheckbox).toHaveTextContent("Also export .co-bundle");
     expect(within(bundleCheckbox).getByRole("checkbox")).toBeChecked();
 
     const coCheckbox = within(dialog).getByTestId("checkbox-include-co");
     expect(within(coCheckbox).getByRole("checkbox")).not.toBeChecked();
-    // no mandatory warning while 包含版本历史 is off
+    // no mandatory warning while Include version history is off
     expect(screen.queryByTestId("export-warning")).not.toBeInTheDocument();
 
-    // checking 包含版本历史 reveals the mandatory warning (doc 14.6)
+    // checking Include version history reveals the mandatory warning (doc 14.6)
     await user.click(within(coCheckbox).getByRole("checkbox"));
     expect(await screen.findByTestId("export-warning")).toHaveTextContent(
       INCLUDE_CO_WARNING_TEXT,
@@ -212,9 +212,9 @@ describe("Agent Deck", () => {
     await user.keyboard("{Control>}k{/Control}");
     const palette = await screen.findByTestId("command-palette");
     expect(palette).toBeInTheDocument();
-    expect(screen.getByText("回滚到上一步")).toBeInTheDocument();
-    expect(screen.getByText("查看历史")).toBeInTheDocument();
-    expect(screen.getByText("创建分支")).toBeInTheDocument();
+    expect(screen.getByText("Revert to previous step")).toBeInTheDocument();
+    expect(screen.getByText("View History")).toBeInTheDocument();
+    expect(screen.getByText("Create Branch")).toBeInTheDocument();
   });
 
   it("streams assistant tokens into the chat while running", async () => {
@@ -222,13 +222,13 @@ describe("Agent Deck", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.type(screen.getByLabelText("消息输入"), "写一段总结");
-    await user.click(screen.getByRole("button", { name: "发送" }));
+    await user.type(screen.getByLabelText("Message Input"), "Write a summary");
+    await user.click(screen.getByRole("button", { name: "Send" }));
 
     // the streamed token lands in the assistant message
-    expect(await screen.findByText("已完成。")).toBeInTheDocument();
+    expect(await screen.findByText("Done.")).toBeInTheDocument();
     expect(sendChatStream).toHaveBeenCalledWith(
-      "写一段总结",
+      "Write a summary",
       undefined,
       "sidebar-user",
       expect.any(Function),
@@ -251,15 +251,15 @@ describe("Agent Deck", () => {
             confirmation: {
               token: "tok-123",
               tool: "replaceRange",
-              summary: "替换第 1-4 段",
+              summary: "Replace paragraphs 1-4",
               snapshot_hash: "abc",
             },
-            reply: "该改动需要确认",
+            reply: "This change requires confirmation",
           },
         });
         return {
           status: "needs_confirmation",
-          reply: "该改动需要确认",
+          reply: "This change requires confirmation",
           change_summary: [],
           round_id: "r2",
           needs_confirmation: true,
@@ -271,8 +271,8 @@ describe("Agent Deck", () => {
     );
 
     render(<App />);
-    await user.type(screen.getByLabelText("消息输入"), "修改第一段");
-    await user.click(screen.getByRole("button", { name: "发送" }));
+    await user.type(screen.getByLabelText("Message Input"), "Modify the first paragraph");
+    await user.click(screen.getByRole("button", { name: "Send" }));
 
     const confirmRow = await screen.findByTestId("confirm-row");
     expect(confirmRow).toBeInTheDocument();
@@ -305,15 +305,15 @@ describe("Agent Deck", () => {
             confirmation: {
               token: "tok-456",
               tool: "insertText",
-              summary: "插入一段文字",
+              summary: "Insert a paragraph of text",
               snapshot_hash: "def",
             },
-            reply: "该改动需要确认",
+            reply: "This change requires confirmation",
           },
         });
         return {
           status: "needs_confirmation",
-          reply: "该改动需要确认",
+          reply: "This change requires confirmation",
           change_summary: [],
           round_id: "r3",
           needs_confirmation: true,
@@ -325,8 +325,8 @@ describe("Agent Deck", () => {
     );
 
     render(<App />);
-    await user.type(screen.getByLabelText("消息输入"), "插入一段话");
-    await user.click(screen.getByRole("button", { name: "发送" }));
+    await user.type(screen.getByLabelText("Message Input"), "Insert a sentence");
+    await user.click(screen.getByRole("button", { name: "Send" }));
 
     const confirmRow = await screen.findByTestId("confirm-row");
     await user.click(within(confirmRow).getByTestId("btn-reject"));

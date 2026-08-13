@@ -4,17 +4,17 @@
 
 import type { ExportParams, ExportResult } from "../types";
 
-/** Mandatory warning shown when "包含版本历史 (.co/)" is checked (doc 14.6). */
+/** Mandatory warning shown when "Include version history (.co/)" is checked (doc 14.6). */
 export const INCLUDE_CO_WARNING_TEXT =
-  "勾选后若使用 Microsoft Word 或 WPS 打开此文件，版本历史将会丢失";
+  "If checked, version history will be lost when opening this file in Microsoft Word or WPS";
 
 export interface ExportDialogState {
   open: boolean;
-  /** 包含版本历史 (.co/) — keeps .co/ inside the exported copy. */
+  /** Include version history (.co/) — keeps .co/ inside the exported copy. */
   includeCo: boolean;
-  /** 同时导出 .co-bundle — companion file with the full history (default on). */
+  /** Also export .co-bundle — companion file with the full history (default on). */
   includeBundle: boolean;
-  /** 打包为 .coffice.zip — optional zip of document + bundle. */
+  /** Package as .coffice.zip — optional zip of document + bundle. */
   packageZip: boolean;
   exporting: boolean;
   error: string | null;

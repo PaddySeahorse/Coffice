@@ -20,12 +20,12 @@ describe("export dialog state", () => {
     expect(state.open).toBe(false);
   });
 
-  it("hides the warning while 包含版本历史 is unchecked", () => {
+  it("hides the warning while Include version history is unchecked", () => {
     const state = createInitialExportState();
     expect(exportWarnings(state)).toEqual([]);
   });
 
-  it("shows the mandatory warning when 包含版本历史 is checked", () => {
+  it("shows the mandatory warning when Include version history is checked", () => {
     let state = createInitialExportState();
     state = exportDialogReducer(state, { type: "toggle", field: "includeCo" });
     expect(state.includeCo).toBe(true);
@@ -34,7 +34,7 @@ describe("export dialog state", () => {
     expect(warnings).toHaveLength(1);
   });
 
-  it("unchecking 包含版本历史 hides the warning again", () => {
+  it("unchecking Include version history hides the warning again", () => {
     let state = createInitialExportState();
     state = exportDialogReducer(state, { type: "toggle", field: "includeCo" });
     state = exportDialogReducer(state, { type: "toggle", field: "includeCo" });

@@ -203,9 +203,9 @@ export const MOCK_HISTORY: CommitInfo[] = [
   },
   {
     hash: "4d0b8a21",
-    author: "human:张三",
+    author: "human:John Doe",
     email: "zhangsan@example.com",
-    message: "撰写引言部分",
+    message: "Write the introduction section",
     timestamp: "2026-07-31T13:48:33+00:00",
   },
   {
@@ -217,9 +217,9 @@ export const MOCK_HISTORY: CommitInfo[] = [
   },
   {
     hash: "1b6d5f08",
-    author: "human:李四",
+    author: "human:Jane Doe",
     email: "lisi@example.com",
-    message: "初始大纲：项目背景、目标与交付物",
+    message: "Initial outline: Project background, goals and deliverables",
     timestamp: "2026-07-31T09:05:47+00:00",
   },
 ];
@@ -233,17 +233,17 @@ export const MOCK_CONTEXT: DocumentContext = {
   docId: "default",
   path: "/tmp/report.docx",
   outline: [
-    { start: 0, end: 18, level: 1, style: "Heading 1", text: "## 项目背景" },
-    { start: 24, end: 40, level: 1, style: "Heading 1", text: "## 目标与交付物" },
-    { start: 47, end: 60, level: 2, style: "Heading 2", text: "### 里程碑" },
+    { start: 0, end: 18, level: 1, style: "Heading 1", text: "## Project Background" },
+    { start: 24, end: 40, level: 1, style: "Heading 1", text: "## Goals and Deliverables" },
+    { start: 47, end: 60, level: 2, style: "Heading 2", text: "### Milestones" },
   ],
-  selection: "第 1 段（共 3 段），样式：正文",
+  selection: "Paragraph 1 (of 3), Style: Body Text",
 };
 
 export const MOCK_CHANGES: AppliedToolCall[] = [
   {
     tool: "insertText",
-    arguments: { pos: "end", text: "本报告总结本季度进展。\n下一步计划包括发布路线图。", style: "正文" },
+    arguments: { pos: "end", text: "This report summarizes this quarter's progress.\nNext steps include releasing the roadmap.", style: "Body Text" },
     result: { ok: true, docId: "default", inserted_at: 312, redline: "redline-1" },
     ok: true,
   },
@@ -260,7 +260,7 @@ export function mockChatReply(message: string, sessionId: string): ChatResult {
   const summary: AppliedToolCall[] = [
     {
       tool: "insertText",
-      arguments: { pos: "end", text: "根据您的指示：\n" + message },
+      arguments: { pos: "end", text: "According to your instructions:\n" + message },
       result: { ok: true, docId: "default", inserted_at: 320, redline: "redline-mock" },
       ok: true,
     },
@@ -268,7 +268,7 @@ export function mockChatReply(message: string, sessionId: string): ChatResult {
   return {
     status: "complete",
     reply:
-      "已完成：我已根据您的指示插入了一段内容，并保持了文档现有风格。您可以在「Diff」面板查看本次改动，或通过「导出」保存带版本历史的副本。",
+      "Done: I have inserted content according to your instructions, maintaining the existing document style. You can view this change in the 'Diff' panel, or save a copy with version history via 'Export'.",
     change_summary: summary,
     round_id: "mock-round",
     needs_confirmation: false,

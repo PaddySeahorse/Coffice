@@ -17,8 +17,8 @@ describe("settingsApi", () => {
 
   it("translates an aborted probe into a timeout message", () => {
     const err = new DOMException("Fetch is aborted", "AbortError");
-    expect(probeErrorMessage(err)).toContain("超时");
-    expect(probeErrorMessage(err)).toContain("25 秒");
+    expect(probeErrorMessage(err)).toContain("timed out");
+    expect(probeErrorMessage(err)).toContain("25 seconds");
   });
 
   it("keeps other error messages as-is", () => {
@@ -50,6 +50,6 @@ describe("settingsApi", () => {
 
     const result = await testSettings(UPDATE);
     expect(result.ok).toBe(false);
-    expect(result.error).toContain("超时");
+    expect(result.error).toContain("timed out");
   });
 });
