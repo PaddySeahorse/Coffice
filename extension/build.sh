@@ -78,7 +78,7 @@ if not icon.exists():
 # -- sync the shared contract/doc-commands into the extension package -------
 pkg_dir = ext / "python" / "coffice"
 pkg_dir.mkdir(parents=True, exist_ok=True)
-for name in ("contract.py", "doc_commands.py"):
+for name in ("contract.py", "doc_commands.py", "co_save.py"):
     source = ext.parent / "src" / "coffice" / "sidebar" / name
     target = pkg_dir / name
     header = (
@@ -110,6 +110,7 @@ files = [
     "python/coffice/__init__.py",
     "python/coffice/contract.py",
     "python/coffice/doc_commands.py",
+    "python/coffice/co_save.py",
 ]
 missing = [f for f in files if not (ext / f).exists()]
 if missing:

@@ -39,6 +39,7 @@ EXPECTED_ENTRIES = {
     "python/coffice/__init__.py",
     "python/coffice/contract.py",
     "python/coffice/doc_commands.py",
+    "python/coffice/co_save.py",
 }
 
 
@@ -224,6 +225,14 @@ def test_shipped_doc_commands_matches_source(oxt_path: Path) -> None:
     assert shipped_body == source
 
 
+def test_shipped_co_save_matches_source(oxt_path: Path) -> None:
+    shipped = read_zip(oxt_path, "python/coffice/co_save.py").decode("utf-8")
+    shipped_body = "\n".join(shipped.splitlines()[1:]).rstrip("\n")
+    source_path = REPO_ROOT / "src" / "coffice" / "sidebar" / "co_save.py"
+    source = source_path.read_text(encoding="utf-8").rstrip("\n")
+    assert shipped_body == source
+
+
 def test_shipped_package_imports(oxt_path: Path, tmp_path: Path) -> None:
     """Import the shipped ``coffice`` package exactly as the UNO component does.
 
@@ -241,7 +250,13 @@ def test_shipped_package_imports(oxt_path: Path, tmp_path: Path) -> None:
         zf.extractall(extracted)
     env = {**os.environ, "PYTHONPATH": str(extracted / "python")}
     result = subprocess.run(
-        [sys.executable, "-c", "import coffice.contract; import coffice.doc_commands"],
+        [
+            sys.executable,
+            "-c",
+            "import coffice.contract; "
+            "import coffice.doc_commands; "
+            "import coffice.co_save",
+        ],
         cwd=tmp_path,
         env=env,
         capture_output=True,

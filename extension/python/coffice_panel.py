@@ -23,6 +23,8 @@ The UNO-free hosting contract and document-command logic live in the
 import os
 import sys
 import traceback
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -41,7 +43,7 @@ from com.sun.star.ui import (
 )
 from com.sun.star.ui.UIElementType import TOOLPANEL as UET_TOOLPANEL
 
-from coffice import contract, doc_commands
+from coffice import co_save, contract, doc_commands
 
 IMPL_FACTORY = "org.coffice.sidebar.PanelFactory"
 IMPL_PROTOCOL_HANDLER = "org.coffice.sidebar.ProtocolHandler"
@@ -70,6 +72,16 @@ def _create(ctx, service):
 
 def _path_to_url(path: str) -> str:
     return Path(path).resolve().as_uri()
+
+
+def _url_to_path(url: str) -> str | None:
+    """Convert a ``file://`` URL back to a local path (or None when not file)."""
+    if not url:
+        return None
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme != "file":
+        return None
+    return urllib.request.url2pathname(parsed.path)
 
 
 def _filter_for(path: str) -> str:
@@ -218,16 +230,40 @@ class _UnoDocBridge:
         doc = self._doc()
         if doc is None:
             raise doc_commands.CommandError("no document to save")
-        try:
-            if path:
-                doc.storeToURL(_path_to_url(path), _make_props(FilterName=_filter_for(path)))
-                return path
+        target = path
+        if target is None:
+            target = _url_to_path(doc.getLocation() if doc else None)
+        if target is None:
+            # New, never-saved document: no path to co-preserve, so fall back
+            # to LibreOffice's native Save (shows the Save As dialog).
             frame = self._frame()
             if frame is not None:
                 _dispatch_uno(self.ctx, frame, ".uno:Save")
             return None
+        bundle = None
+        try:
+            bundle = co_save.backup_history(target)
+            doc.storeToURL(
+                _path_to_url(target), _make_props(FilterName=_filter_for(target))
+            )
+            if bundle is not None:
+                co_save.restore_history(target, bundle)
+                co_save.commit_snapshot(target)
         except Exception as exc:
-            raise doc_commands.CommandError(f"could not save the document: {exc}") from exc
+            if bundle is not None:
+                raise doc_commands.CommandError(
+                    f"could not save the document: {exc} "
+                    f"(history preserved at {bundle})"
+                ) from exc
+            raise doc_commands.CommandError(
+                f"could not save the document: {exc}"
+            ) from exc
+        if bundle is not None:
+            try:
+                os.remove(bundle)
+            except OSError:
+                pass
+        return target
 
     def current_doc_id(self):
         return self._doc_id(self._doc())
