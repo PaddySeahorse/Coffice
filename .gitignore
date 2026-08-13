@@ -37,3 +37,7 @@ extension/python/coffice/doc_commands.py
 *.swp
 .idea/
 .vscode/
+
+# AI tool local caches
+.trae-html-share-packages/
+.monkeycode/
