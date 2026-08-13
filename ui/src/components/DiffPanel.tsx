@@ -20,7 +20,7 @@ export function DiffPanel({ changes, sessionId, onAccept, onReject, busy }: Diff
   return (
     <section className="panel" data-testid="diff-panel">
       <div className="panel-scroll">
-        <h3 className="section-title">Session Changes（{changes.length}）</h3>
+        <h3 className="section-title">Session Changes ({changes.length})</h3>
         {changes.length === 0 ? (
           <p className="empty-hint">
             No changes yet. Send instructions to the AI in the Chat panel to see tool call summaries here.
