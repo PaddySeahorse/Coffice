@@ -171,7 +171,7 @@ export default function App() {
       } else {
         appendMessage({
           role: "assistant",
-          content: pending?.summary || fallbackText || "该改动需要确认",
+          content: pending?.summary || fallbackText || "This change requires confirmation",
           pending,
         });
       }
@@ -238,7 +238,7 @@ export default function App() {
       if (result.status === "error") {
         appendMessage({
           role: "system",
-          content: result.error ?? "发生错误",
+          content: result.error ?? "An error occurred",
           error: true,
         });
         return;
@@ -261,7 +261,7 @@ export default function App() {
   const handleConfirm = useCallback(
     async (pending: PendingConfirmation, action: "confirm" | "reject"): Promise<boolean> => {
       if (!sessionId) {
-        showBanner("error", "没有可用的会话 ID");
+        showBanner("error", "No available session ID");
         return false;
       }
       setBusyChat(true);
@@ -296,7 +296,7 @@ export default function App() {
       setBusyChat(false);
       pruneEmptyStream(streaming);
       if (result.status === "error") {
-        appendMessage({ role: "system", content: result.error ?? "操作失败", error: true });
+        appendMessage({ role: "system", content: result.error ?? "Operation failed", error: true });
         return false;
       }
       // The pending change was resolved: hide its confirm prompt so the same
@@ -329,7 +329,7 @@ export default function App() {
         if (!accepted) return;
       }
       setChangeSummary((current) => current.filter((item) => item !== change));
-      showBanner("success", `已接受：${summarizeToolCall(change)}`);
+      showBanner("success", `Accepted: ${summarizeToolCall(change)}`);
     },
     [handleConfirm, messages, showBanner],
   );
@@ -342,7 +342,7 @@ export default function App() {
         if (!rejected) return;
       }
       setChangeSummary((current) => current.filter((item) => item !== change));
-      showBanner("info", `已拒绝：${summarizeToolCall(change)}（已从改动列表移除）`);
+      showBanner("info", `Rejected: ${summarizeToolCall(change)} (removed from change list)`);
     },
     [handleConfirm, messages, showBanner],
   );
@@ -367,9 +367,9 @@ export default function App() {
       try {
         const result = await callTool("rollback", { docId: context.docId, hash });
         if (result.ok === false) {
-          showBanner("error", String(result.error ?? "回滚失败"));
+          showBanner("error", String(result.error ?? "Revert failed"));
         } else {
-          showBanner("success", `已回滚到 ${hash.slice(0, 7)}`);
+          showBanner("success", `Reverted to ${hash.slice(0, 7)}`);
         }
         void refreshHistory();
       } catch (error) {
@@ -415,35 +415,35 @@ export default function App() {
     () => [
       {
         id: "rollback-prev",
-        label: "回滚到上一步",
-        hint: "回滚到上一个版本提交",
+        label: "Revert to previous step",
+        hint: "Revert to previous commit",
         run: () => {
           if (history.length >= 2) {
             void handleRollback(history[1].hash);
           } else {
-            showBanner("info", "没有可回滚的提交（至少需要两个提交）");
+            showBanner("info", "No commits to revert to (requires at least two commits)");
           }
         },
       },
       {
         id: "view-history",
-        label: "查看历史",
-        hint: "打开版本历史面板",
+        label: "View History",
+        hint: "Open version history panel",
         run: () => setActiveSection("history"),
       },
       {
         id: "create-branch",
-        label: "创建分支",
-        hint: "在当前提交创建命名分支",
+        label: "Create Branch",
+        hint: "Create named branch at current commit",
         run: () => {
-          const name = window.prompt("分支名称：");
+          const name = window.prompt("Branch name:");
           if (!name?.trim()) return;
           void callTool("branch", { docId: context.docId, name: name.trim() })
             .then((result) => {
               if (result.ok === false) {
-                showBanner("error", String(result.error ?? "创建分支失败"));
+                showBanner("error", String(result.error ?? "Create branch failed"));
               } else {
-                showBanner("success", `已创建分支 ${name.trim()}`);
+                showBanner("success", `Created branch ${name.trim()}`);
               }
             })
             .catch((error: unknown) =>
@@ -453,17 +453,17 @@ export default function App() {
       },
       {
         id: "import-bundle",
-        label: "导入版本历史 (.co-bundle)",
-        hint: "从 .co-bundle 恢复历史",
+        label: "Import version history (.co-bundle)",
+        hint: "Restore history from .co-bundle",
         run: () => {
-          const path = window.prompt(".co-bundle 路径：");
+          const path = window.prompt(".co-bundle path:");
           if (!path?.trim()) return;
           void importBundle(path.trim(), context.docId)
             .then((result) => {
               if (result.ok === false) {
-                showBanner("error", String(result.error ?? "导入失败"));
+                showBanner("error", String(result.error ?? "Import failed"));
               } else {
-                showBanner("success", "版本历史已导入");
+                showBanner("success", "Version history imported");
                 void refreshHistory();
               }
             })

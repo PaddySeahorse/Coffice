@@ -46,7 +46,7 @@ describe("SettingsPanel", () => {
     expect(screen.getByTestId("input-api-key")).toHaveValue("");
     expect(screen.getByTestId("input-api-key")).toHaveAttribute(
       "placeholder",
-      "已设置，留空保持不变",
+      "Set, leave blank to keep unchanged",
     );
   });
 
@@ -78,7 +78,7 @@ describe("SettingsPanel", () => {
       });
     });
     expect(await screen.findByTestId("settings-notice")).toHaveTextContent(
-      "LLM 配置已保存",
+      "LLM configuration saved",
     );
     // the key field clears after a successful save
     await waitFor(() => expect(apiKey).toHaveValue(""));
@@ -113,7 +113,7 @@ describe("SettingsPanel", () => {
     await user.click(screen.getByTestId("btn-test-settings"));
 
     const notice = await screen.findByTestId("settings-notice");
-    expect(notice).toHaveTextContent("连接成功");
+    expect(notice).toHaveTextContent("Connection successful");
     expect(mocks.testSettings).toHaveBeenCalledWith({
       base_url: CURRENT_SETTINGS.base_url,
       model: CURRENT_SETTINGS.model,
@@ -144,7 +144,7 @@ describe("SettingsPanel", () => {
     await user.click(screen.getByTestId("btn-save-settings"));
 
     expect(await screen.findByTestId("settings-notice")).toHaveTextContent(
-      "不能为空",
+      "cannot be empty",
     );
     expect(mocks.saveSettings).not.toHaveBeenCalled();
   });

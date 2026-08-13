@@ -14,16 +14,16 @@ export function ContextPanel({ context, busy, onRefresh }: ContextPanelProps) {
     <section className="panel" data-testid="context-panel">
       <div className="panel-scroll">
         <dl className="kv">
-          <dt>文档 ID</dt>
+          <dt>Document ID</dt>
           <dd>{context.docId}</dd>
-          <dt>路径</dt>
-          <dd>{context.path ?? "（内存文档）"}</dd>
-          <dt>当前选区</dt>
-          <dd>{context.selection ?? "（无）"}</dd>
+          <dt>Path</dt>
+          <dd>{context.path ?? "(In-memory Document)"}</dd>
+          <dt>Current Selection</dt>
+          <dd>{context.selection ?? "(None)"}</dd>
         </dl>
 
         <div className="section-head">
-          <h3 className="section-title">大纲</h3>
+          <h3 className="section-title">Outline</h3>
           <button
             type="button"
             className="btn btn--ghost btn--small"
@@ -31,11 +31,11 @@ export function ContextPanel({ context, busy, onRefresh }: ContextPanelProps) {
             disabled={busy}
             onClick={onRefresh}
           >
-            刷新
+            Refresh
           </button>
         </div>
         {context.outline.length === 0 ? (
-          <p className="empty-hint">暂无大纲。</p>
+          <p className="empty-hint">No outline available.</p>
         ) : (
           <ul className="outline-list">
             {context.outline.map((heading, index) => (

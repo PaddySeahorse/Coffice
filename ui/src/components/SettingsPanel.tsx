@@ -42,7 +42,7 @@ export function SettingsPanel({ onNotify }: SettingsPanelProps) {
 
   const handleSave = async () => {
     if (!baseUrl.trim() || !model.trim()) {
-      setNotice({ kind: "error", text: "Base URL 和 Model 不能为空" });
+      setNotice({ kind: "error", text: "Base URL and Model cannot be empty" });
       return;
     }
     setBusy(true);
@@ -51,8 +51,8 @@ export function SettingsPanel({ onNotify }: SettingsPanelProps) {
       const settings = await saveSettings(update());
       setApiKeySet(settings.api_key_set);
       setApiKey("");
-      setNotice({ kind: "success", text: "LLM 配置已保存" });
-      onNotify("success", "LLM 配置已保存");
+      setNotice({ kind: "success", text: "LLM configuration saved" });
+      onNotify("success", "LLM configuration saved");
     } catch (error) {
       const text = error instanceof Error ? error.message : String(error);
       setNotice({ kind: "error", text });
@@ -63,7 +63,7 @@ export function SettingsPanel({ onNotify }: SettingsPanelProps) {
 
   const handleTest = async () => {
     if (!baseUrl.trim() || !model.trim()) {
-      setNotice({ kind: "error", text: "Base URL 和 Model 不能为空" });
+      setNotice({ kind: "error", text: "Base URL and Model cannot be empty" });
       return;
     }
     setBusy(true);
@@ -72,12 +72,12 @@ export function SettingsPanel({ onNotify }: SettingsPanelProps) {
       const result = await testSettings(update());
       setNotice(
         result.ok
-          ? { kind: "success", text: `连接成功：${result.reply ?? "ok"}` }
-          : { kind: "error", text: result.error ?? "连接失败" },
+          ? { kind: "success", text: `Connection successful: ${result.reply ?? "ok"}` }
+          : { kind: "error", text: result.error ?? "Connection failed" },
       );
       onNotify(
         result.ok ? "success" : "error",
-        result.ok ? "LLM 连接成功" : (result.error ?? "LLM 连接失败"),
+        result.ok ? "LLM connection successful" : (result.error ?? "LLM Connection failed"),
       );
     } finally {
       setBusy(false);
@@ -87,9 +87,9 @@ export function SettingsPanel({ onNotify }: SettingsPanelProps) {
   return (
     <section className="panel settings-panel" data-testid="settings-panel">
       <div className="panel-scroll">
-        <h3 className="section-title">LLM 配置</h3>
+        <h3 className="section-title">LLM Configuration</h3>
         <p className="panel-hint">
-          配置驱动 Agent 的对话模型端点（OpenAI 兼容 API）。
+          Configure the conversational model endpoint driving the Agent (OpenAI-compatible API).
         </p>
 
         <label className="settings-field" data-testid="field-base-url">
@@ -123,7 +123,7 @@ export function SettingsPanel({ onNotify }: SettingsPanelProps) {
             value={apiKey}
             onChange={(event) => setApiKey(event.target.value)}
             placeholder={
-              apiKeySet ? "已设置，留空保持不变" : "选填（本地服务可留空）"
+              apiKeySet ? "Set, leave blank to keep unchanged" : "Optional (can be blank for local services)"
             }
             autoComplete="off"
             data-testid="input-api-key"
@@ -144,7 +144,7 @@ export function SettingsPanel({ onNotify }: SettingsPanelProps) {
             disabled={busy}
             onClick={() => void handleTest()}
           >
-            {busy ? "测试中…" : "测试连接"}
+            {busy ? "Testing..." : "Test Connection"}
           </button>
           <button
             type="button"
@@ -153,7 +153,7 @@ export function SettingsPanel({ onNotify }: SettingsPanelProps) {
             disabled={busy}
             onClick={() => void handleSave()}
           >
-            保存
+            Save
           </button>
         </div>
       </div>

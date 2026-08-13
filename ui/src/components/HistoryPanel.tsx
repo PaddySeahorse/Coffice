@@ -35,9 +35,9 @@ export function HistoryPanel({ commits, busy, onRollback, onPreview }: HistoryPa
   return (
     <section className="panel" data-testid="history-panel">
       <div className="panel-scroll">
-        <h3 className="section-title">版本历史（co log）</h3>
+        <h3 className="section-title">Version History (co log)</h3>
         {sorted.length === 0 ? (
-          <p className="empty-hint">暂无提交。保存文档后运行快照即可开始记录历史。</p>
+          <p className="empty-hint">No commits yet. Save the document and take a snapshot to start recording history.</p>
         ) : (
           <ol className="history-list">
             {sorted.map((commit, index) => {
@@ -71,7 +71,7 @@ export function HistoryPanel({ commits, busy, onRollback, onPreview }: HistoryPa
                           ))}
                         </ul>
                       ) : (
-                        <p className="history-preview-note">此提交无文件差异。</p>
+                        <p className="history-preview-note">This commit has no file diffs.</p>
                       )}
                       <button
                         type="button"
@@ -80,7 +80,7 @@ export function HistoryPanel({ commits, busy, onRollback, onPreview }: HistoryPa
                         disabled={busy}
                         onClick={() => onRollback(hash)}
                       >
-                        回滚到此版本
+                        Revert to this version
                       </button>
                     </div>
                   )}

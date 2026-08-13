@@ -29,7 +29,7 @@ export function ChatPanel({ messages, busy, onSend, onConfirm }: ChatPanelProps)
       <div className="panel-scroll">
         {messages.length === 0 ? (
           <p className="empty-hint">
-            向 AI 发送消息开始协作。AI 将读取文档并调用工具进行修改。
+            Send a message to the AI to start collaborating. The AI will read the document and call tools to make modifications.
           </p>
         ) : (
           messages.map((message) => (
@@ -61,7 +61,7 @@ export function ChatPanel({ messages, busy, onSend, onConfirm }: ChatPanelProps)
                     data-testid="btn-confirm"
                     onClick={() => onConfirm(message.pending!, "confirm")}
                   >
-                    确认
+                    Confirm
                   </button>
                   <button
                     type="button"
@@ -69,7 +69,7 @@ export function ChatPanel({ messages, busy, onSend, onConfirm }: ChatPanelProps)
                     data-testid="btn-reject"
                     onClick={() => onConfirm(message.pending!, "reject")}
                   >
-                    拒绝
+                    Reject
                   </button>
                 </div>
               )}
@@ -78,7 +78,7 @@ export function ChatPanel({ messages, busy, onSend, onConfirm }: ChatPanelProps)
         )}
         {busy && (
           <p className="chat-typing" data-testid="chat-typing">
-            Agent 正在处理…
+            Agent is processing...
           </p>
         )}
       </div>
@@ -87,12 +87,12 @@ export function ChatPanel({ messages, busy, onSend, onConfirm }: ChatPanelProps)
           type="text"
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
-          placeholder="输入指令，例如：在文档末尾添加总结段落"
-          aria-label="消息输入"
+          placeholder="Enter instructions, e.g., add a summary paragraph at the end of the document"
+          aria-label="Message Input"
           disabled={busy}
         />
         <button type="submit" className="btn btn--primary" disabled={busy || !draft.trim()}>
-          发送
+          Send
         </button>
       </form>
     </section>

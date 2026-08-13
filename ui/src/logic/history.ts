@@ -18,7 +18,7 @@ export function formatTimestamp(timestamp: string | null): string {
   return date.toLocaleString();
 }
 
-/** "abc1234 · 张三" — compact one-line commit identity. */
+/** "abc1234 · John Doe" — compact one-line commit identity. */
 export function commitLabel(commit: CommitInfo): string {
   const hash = shortHash(commit.hash);
   const author = commit.author?.trim() ? commit.author.trim() : "unknown";

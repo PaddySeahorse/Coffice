@@ -1,5 +1,5 @@
 // Command palette (Cmd+K, planning doc 9.2): minimal quick actions —
-// 回滚到上一步 / 查看历史 / 创建分支.
+// Revert to previous step / View History / Create Branch.
 
 import { useEffect, useRef, useState } from "react";
 
@@ -52,8 +52,8 @@ export function CommandPalette({ open, onClose, actions }: CommandPaletteProps) 
           className="palette-input"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="输入命令…"
-          aria-label="命令搜索"
+          placeholder="Enter command..."
+          aria-label="Command Search"
           onKeyDown={(event) => {
             if (event.key === "Escape") onClose();
             if (event.key === "Enter" && filtered[0]) pick(filtered[0]);
@@ -69,7 +69,7 @@ export function CommandPalette({ open, onClose, actions }: CommandPaletteProps) 
             </li>
           ))}
           {filtered.length === 0 && (
-            <li className="palette-empty">无匹配命令</li>
+            <li className="palette-empty">No matching commands</li>
           )}
         </ul>
       </div>
