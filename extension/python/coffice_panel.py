@@ -232,7 +232,7 @@ class _UnoDocBridge:
             raise doc_commands.CommandError("no document to save")
         target = path
         if target is None:
-            target = _url_to_path(doc.getLocation() if doc else None)
+            target = _url_to_path(doc.getLocation())
         if target is None:
             # New, never-saved document: no path to co-preserve, so fall back
             # to LibreOffice's native Save (shows the Save As dialog).
