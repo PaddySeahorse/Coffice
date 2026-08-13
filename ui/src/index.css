@@ -1,4 +1,4 @@
-/* Coffice Agent Deck — dark, VSCode-flavored sidebar styling (plain CSS). */
+/* Coffice Agent Deck — VSCode-flavored sidebar styling (plain CSS). */
 
 :root {
   --bg: #1e1e1e;
@@ -16,6 +16,42 @@
   --warning: #d29922;
   --radius: 6px;
   --rail-width: 160px;
+  --chat-user-bg: #005fb8;
+  --chat-user-border: #0078d4;
+  --chat-tool-bg: #1c3d5a;
+  --chat-tool-border: #29597f;
+  --code-blue: #7fc4ff;
+  --error-text: #ff8f87;
+  --diff-add: #57ab5a;
+  --diff-mod: #d29922;
+  --diff-del: #e5534b;
+  --scrollbar-thumb: #454545;
+}
+
+[data-theme="light"] {
+  --bg: #f3f3f3;
+  --bg-raised: #ffffff;
+  --bg-inset: #f8f8f8;
+  --border: #d4d4d4;
+  --border-soft: #e5e5e5;
+  --text: #242424;
+  --text-dim: #5c5c5c;
+  --text-faint: #8a8a8a;
+  --accent: #0060c0;
+  --accent-hover: #0050a0;
+  --success: #1a7f37;
+  --danger: #cf222e;
+  --warning: #9a6700;
+  --chat-user-bg: #e0f0ff;
+  --chat-user-border: #bce0ff;
+  --chat-tool-bg: #f0f4f8;
+  --chat-tool-border: #d0e0f0;
+  --code-blue: #005cc5;
+  --error-text: #cf222e;
+  --diff-add: #1a7f37;
+  --diff-mod: #9a6700;
+  --diff-del: #cf222e;
+  --scrollbar-thumb: #c1c1c1;
 }
 
 * {
@@ -245,9 +281,13 @@ input {
 }
 
 .chat-message--user {
-  background: #005fb8;
-  border-color: #0078d4;
+  background: var(--chat-user-bg);
+  border-color: var(--chat-user-border);
   align-self: flex-end;
+}
+
+[data-theme="light"] .chat-message--user .chat-message__content {
+  color: var(--text);
 }
 
 .chat-message--error {
@@ -282,11 +322,11 @@ input {
   display: inline-block;
   margin-top: 6px;
   padding: 2px 8px;
-  background: #1c3d5a;
-  border: 1px solid #29597f;
+  background: var(--chat-tool-bg);
+  border: 1px solid var(--chat-tool-border);
   border-radius: 10px;
   font-size: 12px;
-  color: #7fc4ff;
+  color: var(--code-blue);
 }
 
 .confirm-row {
@@ -363,7 +403,7 @@ input {
 .tool-name {
   font-family: ui-monospace, "Cascadia Code", Menlo, monospace;
   font-size: 12px;
-  color: #7fc4ff;
+  color: var(--code-blue);
 }
 
 .tool-desc {
@@ -388,7 +428,7 @@ input {
 
 .tool-result--error {
   border-color: var(--danger);
-  color: #ff8f87;
+  color: var(--error-text);
 }
 
 /* ------------------------------------------------------------------ diff */
@@ -428,7 +468,7 @@ input {
 .change-tool {
   font-family: ui-monospace, Menlo, monospace;
   font-size: 12px;
-  color: #7fc4ff;
+  color: var(--code-blue);
 }
 
 .change-summary-text {
@@ -504,7 +544,7 @@ input {
 .history-hash {
   font-family: ui-monospace, Menlo, monospace;
   font-size: 12px;
-  color: #7fc4ff;
+  color: var(--code-blue);
   flex-shrink: 0;
 }
 
@@ -544,15 +584,15 @@ input {
 }
 
 .history-diff--m {
-  color: #d29922;
+  color: var(--diff-mod);
 }
 
 .history-diff--a {
-  color: #57ab5a;
+  color: var(--diff-add);
 }
 
 .history-diff--d {
-  color: #e5534b;
+  color: var(--diff-del);
 }
 
 .history-preview-note {
@@ -639,7 +679,7 @@ input {
 .btn--danger {
   background: transparent;
   border-color: var(--danger);
-  color: #ff8f87;
+  color: var(--error-text);
 }
 
 .btn--danger:hover:not(:disabled) {
@@ -730,7 +770,7 @@ input {
 
 .export-error {
   margin: 8px 0;
-  color: #ff8f87;
+  color: var(--error-text);
   font-size: 12px;
 }
 
@@ -849,7 +889,7 @@ input {
 .banner--error {
   background: rgba(218, 54, 51, 0.18);
   border: 1px solid rgba(218, 54, 51, 0.5);
-  color: #ff8f87;
+  color: var(--error-text);
 }
 
 /* ------------------------------------------------------------ settings */
@@ -906,7 +946,7 @@ input {
 .settings-notice--error {
   background: rgba(218, 54, 51, 0.15);
   border: 1px solid rgba(218, 54, 51, 0.5);
-  color: #ff8f87;
+  color: var(--error-text);
 }
 
 .settings-notice--info {
@@ -923,7 +963,7 @@ input {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #454545;
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 
