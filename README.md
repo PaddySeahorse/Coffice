@@ -54,6 +54,73 @@ Python package layout under `src/coffice/`:
 
 ## Getting started
 
+### One-line install (no compilation)
+
+Coffice ships prebuilt release assets (a Python wheel, the built Agent Deck
+UI, and the LibreOffice extension), so the installers below download and
+deploy the latest release with no compiler or Node.js toolchain required.
+
+**Linux / macOS** (requires `curl`, Python 3.11+, `tar`):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/PaddySeahorse/Coffice/main/scripts/install.sh | bash
+```
+
+**Windows** (requires Python 3.11+ on PATH; PowerShell 5.1+):
+
+```powershell
+irm https://raw.githubusercontent.com/PaddySeahorse/Coffice/main/scripts/install.ps1 | iex
+```
+
+Both installers deploy to `~/.coffice` (Unix) or
+`%LOCALAPPDATA%\coffice` (Windows) and add a `coffice` launcher:
+
+- `coffice run-agent` — start the agent HTTP facade (`COFFICE_AGENT_PORT`, default 8790)
+- `coffice run-ui` — serve the Agent Deck on http://127.0.0.1:8787/ (`COFFICE_UI_PORT`)
+- `coffice run-mcp` — run the MCP server over stdio
+- `coffice install-oxt` — install the LibreOffice extension via `unopkg`
+
+Options: `--prefix DIR` (install elsewhere), `--version vX.Y.Z` (pin a
+release), `--install-oxt` (auto-install the LO extension), `--configure-shell`
+(add the launcher to `PATH`). The PowerShell equivalents are `-Prefix`,
+`-Version`, `-InstallOxt`, `-ConfigureShell`.
+
+#### co CLI (version-control snapshots)
+
+The installer detects whether the `co` binary (Git-style snapshots for Office
+files) is already available. If not, it offers to download a prebuilt `co`
+from its own release (<https://github.com/PaddySeahorse/co>) — no CMake/C++
+toolchain needed. In an interactive terminal you get a `[y/N]` prompt; in a
+non-interactive shell use:
+
+```sh
+bash scripts/install.sh --with-co        # force-install co from its release
+bash scripts/install.sh --without-co     # never touch co
+CO_INSTALL=yes bash scripts/install.sh   # or via env var (auto|yes|no)
+```
+
+On Windows: `-WithCo` / `-WithoutCo` / `$env:CO_INSTALL`. `co` release assets
+are amd64-only; on other architectures the script prints a hint pointing at
+`scripts/install_co.sh` (source build) instead. When co is installed, `CO_BIN`
+is set (user env on Windows with `-ConfigureShell`), matching what the Python
+client resolves in `coffice.versioning`.
+
+#### LibreOffice extension
+
+The installer detects LibreOffice (`unopkg` on Linux, the `LibreOffice.app`
+bundle on macOS, `%ProgramFiles%\LibreOffice\program\unopkg.exe` on Windows):
+
+- LibreOffice present → the extension is downloaded and installed
+  automatically via `unopkg add --force`.
+- LibreOffice absent → the script does **not** install the extension; it prints
+  a hint with the LibreOffice download link
+  (<https://www.libreoffice.org/download/>) and the `coffice install-oxt`
+  command to run once LibreOffice is in place. Pass `--install-oxt`
+  (`-InstallOxt`) to turn that hint into a hard error instead.
+
+> LibreOffice itself is external and not bundled; the extension and document
+> features need it installed separately (see `docs/route1.md`).
+
 ### Linux (Debian/Ubuntu)
 
 ```sh
