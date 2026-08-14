@@ -40,6 +40,7 @@ its JSONL audit writer; it is kept deliberately simple (a plain
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
@@ -183,12 +184,48 @@ def pre_round_snapshot(
 
 
 def _save(doc: Any) -> str | None:
-    """Save the doc so co can see the edit; returns the path (None on failure)."""
+    """Save the doc so co can see the edit; returns the path (None on failure).
+
+    LibreOffice's ``storeToURL`` rewrites the whole Office package and drops
+    the ``.co/`` version-history directory (ADR-001), so when the document
+    carries an embedded ``.co/`` history the save is wrapped in the same
+    backup/restore pipeline the sidebar uses (:mod:`coffice.sidebar.co_save`):
+    export the history to a temp bundle first, then put it back after LO
+    rewrites the file. Docs without a path (or without any ``.co/`` entries)
+    fall through to a plain save, matching the old behaviour.
+    """
+    path = getattr(doc, "_path", None)
+    if not path:
+        try:
+            return doc.save()
+        except Exception:  # noqa: BLE001 - unsaved in-memory docs are allowed
+            logger.debug("document save failed; edit kept in memory", exc_info=True)
+            return None
+    from coffice.sidebar.co_save import backup_history, restore_history
+
+    bundle: str | None = None
     try:
-        return doc.save()
+        bundle = backup_history(str(path))
+    except Exception:  # noqa: BLE001 - non-ZIP/in-memory docs have no history
+        bundle = None
+    try:
+        saved = doc.save()
     except Exception:  # noqa: BLE001 - unsaved in-memory docs are allowed
         logger.debug("document save failed; edit kept in memory", exc_info=True)
         return None
+    if bundle is not None:
+        try:
+            restore_history(str(path), bundle)
+        except Exception:  # noqa: BLE001 - history restore must not fail the edit
+            logger.warning(
+                "failed to restore .co/ history after save for %s", path, exc_info=True
+            )
+        finally:
+            try:
+                os.unlink(bundle)
+            except OSError:
+                pass
+    return saved
 
 
 #: Track Changes is *display only* (ADR diff_projector): write tools never
