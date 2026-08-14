@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.6.0 (2026-08-14)
+
+### Features
+
+- Add one-line release installers with LO and co detection
+  ([`782eab0`](https://github.com/PaddySeahorse/Coffice/commit/782eab03b63d7b6a9e1c94f2dbde3e387c034ba0))
+
+
 ## v0.5.1 (2026-08-14)
 
 ### Bug Fixes
