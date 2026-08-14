@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.5.1 (2026-08-14)
+
+### Bug Fixes
+
+- **mcp**: Preserve .co/ version history on write-tool saves
+  ([`47cfd31`](https://github.com/PaddySeahorse/Coffice/commit/47cfd31a236b6a991509bb82aab6380c1b70d10d))
+
+
 ## v0.5.0 (2026-08-13)
 
 ### Features
