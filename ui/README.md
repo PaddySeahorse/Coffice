@@ -36,14 +36,18 @@ agent API / MCP server are up: every API call falls back to bundled mock data.
 - **History** — `co log` timeline (`GET /history`): hash, author, message,
   timestamp; per-commit preview (`GET /diff` vs. the previous commit) and a
   rollback button (`POST /tool` → `rollback`).
+- **Settings** — LLM endpoint config: base URL / model / API key (masked), a
+  connection test (`POST /settings/test`), and save (`POST /settings`) that
+  hot-swaps the in-process LLM client and persists to `~/.coffice/llm.json`.
 - **Status bar strip** — `Agent: idle/working/needs confirmation/error` and
   `co: N commits`.
-- **Export dialog (doc 14.6)** — checkbox 包含版本历史 (.co/) with the mandatory
-  warning "勾选后若使用 Microsoft Word 或 WPS 打开此文件，版本历史将会丢失" when
-  checked, checkbox 同时导出 .co-bundle (default on), optional .coffice.zip
-  packaging, [导出]/[取消]; wired to the `exportDoc` tool.
-- **Command palette (Cmd+K / Ctrl+K)** — quick actions 回滚到上一步 / 查看历史 /
-  创建分支 (+ 导入版本历史).
+- **Export dialog (doc 14.6)** — checkbox "Include version history (.co/)" with
+  the mandatory warning "If checked, version history will be lost when opening
+  this file in Microsoft Word or WPS" when checked, checkbox "Also export
+  .co-bundle" (default on), optional "Package as .coffice.zip" packaging, and
+  Export / Cancel buttons; wired to the `exportDoc` tool.
+- **Command palette (Cmd+K / Ctrl+K)** — quick actions: Revert to previous
+  step / View History / Create Branch / Import version history (.co-bundle).
 
 ## API contract (aligned with the agent / MCP / versioning beads)
 
@@ -58,6 +62,10 @@ All payload shapes mirror the backend tools; the UI never redefines them.
 | `POST /tool`     | read triggers, export, rollback, branch| `{name, arguments}` → tool result dict  |
 | `GET /history`   | History panel                          | `{commits: [{hash, author, email, message, timestamp}]}` |
 | `GET /diff`      | History preview                        | `{diff: [{status: A\|D\|M, path}]}`     |
+| `GET /settings`  | Settings panel load                    | `{settings: {base_url, model, api_key_set}}` |
+| `POST /settings` | Settings panel save                    | applies + persists LLM endpoint to `~/.coffice/llm.json` |
+| `POST /settings/test` | Settings connection test          | pings candidate endpoint (`{ok, reply}`) |
+| `GET /download`  | Export download                        | exported document as a file attachment |
 
 The agent facade is configured with `VITE_COFFICE_AGENT_URL` (default
 `http://127.0.0.1:8790/`). When the facade is unreachable, reads return the

@@ -172,7 +172,7 @@ so it is safe to run in CI. A full pass prints `SMOKE PASS`.
 
 ```sh
 make lint      # ruff check src tests
-make test      # pytest (249 tests; LO/co-dependent tests skip cleanly)
+make test      # pytest (LO/co-dependent tests skip cleanly)
 make ui-test   # vitest (Agent Deck UI)
 make build-oxt # extension build must succeed
 ```
@@ -234,9 +234,11 @@ Phase 1 deliberately **excludes**:
   image understanding of the page.
 - **Multi-user / multi-agent** — one human operator + one `AI-Writer` agent,
   one document, one co repository.
-- **Branch/merge/tag** — upstream `co` does not implement them; the wrapper
-  raises `CoUnsupportedError` and the tools surface a readable error (the fake
-  test binary emulates them so the API is exercised in unit tests).
+- **Branch/merge/tag** — the tools are registered and wired to the `co` CLI;
+  `branch` runs natively, while `merge`/`tag` check the installed binary's
+  capabilities (`_require_command`) and raise `CoUnsupportedError` when
+  missing. The fake test binary emulates them so the API is exercised in unit
+  tests.
 - **WebView sidebar** — the MVP LO sidebar panel is a native launcher/status
   panel (no WebView exists on the UNO surface); the React Agent Deck runs in
   the system browser and the postMessage document channel
