@@ -349,8 +349,8 @@ export default function App() {
 
   const handleAcceptAllChanges = useCallback(async () => {
     if (changeSummary.length === 0) return;
-    const pending = messages.find((message) => message.pending)?.pending;
-    if (pending) {
+    const pendings = messages.flatMap((message) => (message.pending ? [message.pending] : []));
+    for (const pending of pendings) {
       const accepted = await handleConfirm(pending, "confirm");
       if (!accepted) return;
     }
