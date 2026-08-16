@@ -335,4 +335,192 @@ describe("Agent Deck", () => {
       expect(screen.queryByTestId("confirm-row")).not.toBeInTheDocument();
     });
   });
+
+  it("shows the agent's changes in a review bar above the composer", async () => {
+    const { sendChatStream } = await import("./api/agentApi");
+    const user = userEvent.setup();
+    vi.mocked(sendChatStream).mockImplementationOnce(
+      async (
+        _message: string,
+        _sessionId: string | undefined,
+        _operator: string | undefined,
+        onEvent?: (event: ChatStreamEvent) => void,
+      ) => {
+        onEvent?.({ event: "tool", data: { tool: "insertText", arguments: { text: "Hello world" }, result: { ok: true }, ok: true } });
+        return {
+          status: "complete",
+          reply: "Done.",
+          change_summary: [
+            {
+              tool: "insertText",
+              arguments: { pos: "end", text: "This report summarizes this quarter's progress." },
+              result: { ok: true },
+              ok: true,
+            },
+          ],
+          round_id: "r1",
+          needs_confirmation: false,
+          confirmation: null,
+          error: null,
+          session_id: "s1",
+        };
+      },
+    );
+
+    render(<App />);
+    await user.type(screen.getByLabelText("Message Input"), "Add a summary");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    // the review bar appears above the composer with a count
+    const bar = await screen.findByTestId("pending-changes");
+    expect(within(bar).getByText("1 pending change")).toBeInTheDocument();
+
+    // per-change summary + content preview are visible without expanding
+    expect(within(bar).getByText("insertText → 1 paragraph")).toBeInTheDocument();
+    expect(within(bar).getByText(/This report summarizes/)).toBeInTheDocument();
+
+    // per-change accept/reject actions are directly available
+    expect(within(bar).getByTestId("pending-accept-0")).toBeInTheDocument();
+    expect(within(bar).getByTestId("pending-reject-0")).toBeInTheDocument();
+  });
+
+  it("collapses the review bar to a summary line with accept/reject all", async () => {
+    const { sendChatStream } = await import("./api/agentApi");
+    const user = userEvent.setup();
+    vi.mocked(sendChatStream).mockImplementationOnce(
+      async (
+        _message: string,
+        _sessionId: string | undefined,
+        _operator: string | undefined,
+        onEvent?: (event: ChatStreamEvent) => void,
+      ) => {
+        onEvent?.({ event: "tool", data: { tool: "insertText", arguments: { text: "Hello world" }, result: { ok: true }, ok: true } });
+        return {
+          status: "complete",
+          reply: "Done.",
+          change_summary: [
+            {
+              tool: "insertText",
+              arguments: { pos: "end", text: "First paragraph." },
+              result: { ok: true },
+              ok: true,
+            },
+            {
+              tool: "applyStyle",
+              arguments: { range: { start: 0, end: 18 }, styleId: "Heading 1" },
+              result: { ok: true },
+              ok: true,
+            },
+          ],
+          round_id: "r1",
+          needs_confirmation: false,
+          confirmation: null,
+          error: null,
+          session_id: "s1",
+        };
+      },
+    );
+
+    render(<App />);
+    await user.type(screen.getByLabelText("Message Input"), "Add a summary");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    const bar = await screen.findByTestId("pending-changes");
+    expect(within(bar).getByText("2 pending changes")).toBeInTheDocument();
+    expect(within(bar).getByTestId("pending-accept-1")).toBeInTheDocument();
+
+    await user.click(within(bar).getByTestId("pending-changes-toggle"));
+    // collapsed: per-change items hidden, accept/reject-all still available
+    expect(within(bar).queryByTestId("pending-accept-1")).not.toBeInTheDocument();
+    expect(within(bar).getByTestId("pending-accept-all")).toBeInTheDocument();
+    expect(within(bar).getByTestId("pending-reject-all")).toBeInTheDocument();
+  });
+
+  it("accepts all pending changes from the review bar", async () => {
+    const { sendChatStream } = await import("./api/agentApi");
+    const user = userEvent.setup();
+    vi.mocked(sendChatStream).mockImplementationOnce(
+      async (
+        _message: string,
+        _sessionId: string | undefined,
+        _operator: string | undefined,
+        onEvent?: (event: ChatStreamEvent) => void,
+      ) => {
+        onEvent?.({ event: "tool", data: { tool: "insertText", arguments: { text: "Hello world" }, result: { ok: true }, ok: true } });
+        return {
+          status: "complete",
+          reply: "Done.",
+          change_summary: [
+            {
+              tool: "insertText",
+              arguments: { pos: "end", text: "Accepted paragraph." },
+              result: { ok: true },
+              ok: true,
+            },
+          ],
+          round_id: "r1",
+          needs_confirmation: false,
+          confirmation: null,
+          error: null,
+          session_id: "s1",
+        };
+      },
+    );
+
+    render(<App />);
+    await user.type(screen.getByLabelText("Message Input"), "Add a summary");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    const bar = await screen.findByTestId("pending-changes");
+    await user.click(within(bar).getByTestId("pending-accept-all"));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("pending-changes")).not.toBeInTheDocument();
+    });
+    expect(screen.getByTestId("banner")).toHaveTextContent("Accepted all changes");
+  });
+
+  it("rejects a single change from the review bar", async () => {
+    const { sendChatStream } = await import("./api/agentApi");
+    const user = userEvent.setup();
+    vi.mocked(sendChatStream).mockImplementationOnce(
+      async (
+        _message: string,
+        _sessionId: string | undefined,
+        _operator: string | undefined,
+        onEvent?: (event: ChatStreamEvent) => void,
+      ) => {
+        onEvent?.({ event: "tool", data: { tool: "insertText", arguments: { text: "Hello world" }, result: { ok: true }, ok: true } });
+        return {
+          status: "complete",
+          reply: "Done.",
+          change_summary: [
+            {
+              tool: "insertText",
+              arguments: { pos: "end", text: "Rejected paragraph." },
+              result: { ok: true },
+              ok: true,
+            },
+          ],
+          round_id: "r1",
+          needs_confirmation: false,
+          confirmation: null,
+          error: null,
+          session_id: "s1",
+        };
+      },
+    );
+
+    render(<App />);
+    await user.type(screen.getByLabelText("Message Input"), "Add a summary");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    const bar = await screen.findByTestId("pending-changes");
+    await user.click(within(bar).getByTestId("pending-reject-0"));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("pending-changes")).not.toBeInTheDocument();
+    });
+    expect(screen.getByTestId("banner")).toHaveTextContent("Rejected:");
+  });
 });

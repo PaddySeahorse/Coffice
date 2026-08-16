@@ -347,6 +347,28 @@ export default function App() {
     [handleConfirm, messages, showBanner],
   );
 
+  const handleAcceptAllChanges = useCallback(async () => {
+    if (changeSummary.length === 0) return;
+    const pending = messages.find((message) => message.pending)?.pending;
+    if (pending) {
+      const accepted = await handleConfirm(pending, "confirm");
+      if (!accepted) return;
+    }
+    setChangeSummary([]);
+    showBanner("success", "Accepted all changes");
+  }, [changeSummary.length, handleConfirm, messages, showBanner]);
+
+  const handleRejectAllChanges = useCallback(async () => {
+    if (changeSummary.length === 0) return;
+    const pending = messages.find((message) => message.pending)?.pending;
+    if (pending) {
+      const rejected = await handleConfirm(pending, "reject");
+      if (!rejected) return;
+    }
+    setChangeSummary([]);
+    showBanner("info", "Rejected all changes");
+  }, [changeSummary.length, handleConfirm, messages, showBanner]);
+
   const handleRunTool = useCallback(
     async (tool: McpToolInfo): Promise<Record<string, unknown>> => {
       setBusyTool(true);
@@ -485,6 +507,11 @@ export default function App() {
             busy={busyChat}
             onSend={(text) => void handleSend(text)}
             onConfirm={(pending, action) => void handleConfirm(pending, action)}
+            changes={changeSummary}
+            onAcceptChange={(change) => void handleAcceptChange(change)}
+            onRejectChange={(change) => void handleRejectChange(change)}
+            onAcceptAll={() => void handleAcceptAllChanges()}
+            onRejectAll={() => void handleRejectAllChanges()}
           />
         );
       case "context":
