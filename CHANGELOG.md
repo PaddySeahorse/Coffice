@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v0.7.0 (2026-08-16)
+
+### Bug Fixes
+
+- **ui**: Confirm all pending changes on accept all
+  ([`763562d`](https://github.com/PaddySeahorse/Coffice/commit/763562d3aa2c161fd46331f2583b99ebaf571cab))
+
+### Features
+
+- **ui**: Embed agent change review bar in the chat composer
+  ([`68e48b4`](https://github.com/PaddySeahorse/Coffice/commit/68e48b4985072a7cc7e0f288e03e0a68eab3a137))
+
+
 ## v0.6.0 (2026-08-14)
 
 ### Features
