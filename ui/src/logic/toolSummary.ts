@@ -66,3 +66,18 @@ export function toolCallDetail(change: AppliedToolCall): string {
     return String(change.arguments);
   }
 }
+
+/** A short preview of the actual content the change writes to the document. */
+export function previewToolCallText(change: AppliedToolCall, maxLength = 120): string {
+  const args = change.arguments ?? {};
+  const text = String(args.text ?? "").trim();
+  if (text) {
+    const single = text.replace(/\s+/g, " ").trim();
+    return single.length > maxLength ? `${single.slice(0, maxLength)}…` : single;
+  }
+  if (Array.isArray(args.data)) {
+    const json = JSON.stringify(args.data);
+    return json.length > maxLength ? `${json.slice(0, maxLength)}…` : json;
+  }
+  return "";
+}

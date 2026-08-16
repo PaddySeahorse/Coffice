@@ -375,6 +375,73 @@ input {
   border-color: var(--accent);
 }
 
+/* ----------------------------------------------------- pending changes */
+
+.pending-changes {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 45%;
+  background: var(--bg-raised);
+  border-top: 1px solid var(--border);
+}
+
+.pending-changes__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.pending-changes__toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pending-changes__count {
+  color: var(--warning);
+}
+
+.pending-changes__actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.pending-changes__list {
+  overflow-y: auto;
+  min-height: 0;
+  padding: 0 12px 10px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.pending-changes__list .change-actions {
+  padding: 8px 10px 10px;
+}
+
+.change-preview {
+  margin: 2px 10px 0;
+  padding: 6px 8px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 72px;
+  overflow: auto;
+}
+
 /* ----------------------------------------------------------------- tools */
 
 .tool-list {

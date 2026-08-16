@@ -4,16 +4,32 @@
 // reject prompt for pending changes.
 
 import { useState } from "react";
-import type { ChatMessageItem, PendingConfirmation } from "../types";
+import type { AppliedToolCall, ChatMessageItem, PendingConfirmation } from "../types";
+import { PendingChanges } from "./PendingChanges";
 
 interface ChatPanelProps {
   messages: ChatMessageItem[];
   busy: boolean;
   onSend: (message: string) => void;
   onConfirm: (pending: PendingConfirmation, action: "confirm" | "reject") => void;
+  changes: AppliedToolCall[];
+  onAcceptChange: (change: AppliedToolCall) => void;
+  onRejectChange: (change: AppliedToolCall) => void;
+  onAcceptAll: () => void;
+  onRejectAll: () => void;
 }
 
-export function ChatPanel({ messages, busy, onSend, onConfirm }: ChatPanelProps) {
+export function ChatPanel({
+  messages,
+  busy,
+  onSend,
+  onConfirm,
+  changes,
+  onAcceptChange,
+  onRejectChange,
+  onAcceptAll,
+  onRejectAll,
+}: ChatPanelProps) {
   const [draft, setDraft] = useState("");
 
   const submit = (event: React.FormEvent) => {
@@ -82,6 +98,14 @@ export function ChatPanel({ messages, busy, onSend, onConfirm }: ChatPanelProps)
           </p>
         )}
       </div>
+      <PendingChanges
+        changes={changes}
+        busy={busy}
+        onAccept={onAcceptChange}
+        onReject={onRejectChange}
+        onAcceptAll={onAcceptAll}
+        onRejectAll={onRejectAll}
+      />
       <form className="chat-composer" onSubmit={submit}>
         <input
           type="text"
