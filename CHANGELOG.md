@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.8.0 (2026-08-16)
+
+### Features
+
+- **ui**: Add Coffice icon as favicon ([#28](https://github.com/PaddySeahorse/Coffice/pull/28),
+  [`7bb2388`](https://github.com/PaddySeahorse/Coffice/commit/7bb2388f055724a138921e54cb37f5a814842673))
+
+
 ## v0.7.0 (2026-08-16)
 
 ### Bug Fixes
